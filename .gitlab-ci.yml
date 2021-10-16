@@ -1,0 +1,37 @@
+# vim: set ft=yaml sw=2 ts=2 et :
+
+stages:
+  - build
+  - deploy
+
+cache:
+  paths:
+    - .ccache
+
+build:cmake:
+  image: ${CMAKE_IMAGE}
+  stage: build
+  script:
+    - apt install -y qtbase5-dev libqt5charts5-dev
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=release ..
+    - make
+  artifacts:
+    paths:
+      - build/src/qstuff
+
+deploy:dpkg:
+  image: ${DEBIAN_IMAGE}
+  stage: deploy
+  script:
+    - yes | mk-build-deps -i || true
+    - git clean -f
+    - dpkg-buildpackage
+    - mkdir dist
+    - cp ../qstuff_* ../qstuff-* dist/
+  artifacts:
+    paths:
+      - dist/qstuff_*
+      - dist/qstuff-*
+
