@@ -1,10 +1,8 @@
+# vim: set ft=yaml ts=2 sw=2 et :
 name: CMake
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+"on":
+  - push
 
 env:
   BUILD_TYPE: Release
@@ -14,10 +12,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      - name: Cache Qt
+        uses: actions/cache@v1
+        with:
+          path: ../Qt
+          key: ${{ runner.os }}-QtCache
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      - name: Install build deps
+        uses: jurplel/install-qt-action@v2
+        with:
+          host: linux
+          target: desktop
+          modules: qtcharts
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+
+      - name: Configure CMake
+        run: >-
+          cmake
+          -B ${{github.workspace}}/build
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      - name: Build
+        run: >-
+          cmake
+          --build ${{github.workspace}}/build
+          --config ${{env.BUILD_TYPE}}

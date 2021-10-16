@@ -1,0 +1,35 @@
+# vim: set ft=yaml ts=2 sw=2 et :
+name: Debian Package
+
+# github's linux runners are too old for us (Qt < 5.15)
+"on":
+  push:
+    branches:
+      - packaging
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install build deps
+        run: |-
+          sudo apt update
+          sudo apt -y install devscripts equivs
+          yes | sudo mk-build-deps -i || true
+
+      - name: Remove temp files
+        run: git clean -f
+
+      - name: Build
+        run: dpkg-buildpackage && mkdir dist && cp ../qstuff_* ../qstuff-* dist/
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: deb packages
+          path: |-
+            dist/*
+
