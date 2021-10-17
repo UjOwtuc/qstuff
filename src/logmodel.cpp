@@ -57,16 +57,9 @@ QVariant LogModel::headerData(int section, Qt::Orientation orientation, int role
 
 void LogModel::setLogs(const QVariantList& data)
 {
-	if (!m_data.isEmpty())
-	{
-		beginRemoveRows(QModelIndex(), 0, m_data.size() -1);
-		m_data.clear();
-		endRemoveRows();
-	}
-
-	beginInsertRows(QModelIndex(), 0, data.size() -1);
+	beginResetModel();
 	m_data = data;
-	endInsertRows();
+	endResetModel();
 }
 
 

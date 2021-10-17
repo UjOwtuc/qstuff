@@ -92,6 +92,7 @@ QStuffMainWindow::QStuffMainWindow()
 
 void QStuffMainWindow::search()
 {
+	setInputsEnabled(false);
 	QUrlQuery queryItems;
 	auto timerange = m_widget->timerangeCombo->currentData(Qt::UserRole).value<QPair<TimeSpec, TimeSpec>>();
 
@@ -105,7 +106,21 @@ void QStuffMainWindow::search()
 	url.setQuery(queryItems);
 	QNetworkRequest req(url);
 	auto reply = m_net_access->get(req);
-	reply->setProperty("request started at", QDateTime::currentDateTime());
+
+	QLabel* taskLabel = new QLabel("Waiting for response headers", m_widget->statusbar);
+	m_widget->statusbar->addWidget(taskLabel);
+
+	QProgressBar* progress = new QProgressBar(m_widget->statusbar);
+	progress->setRange(0, 0);
+	m_widget->statusbar->addWidget(progress);
+
+	connect(reply, &QNetworkReply::downloadProgress, [progress,taskLabel](quint64 received, quint64 total){
+		progress->setMaximum(total);
+		progress->setValue(received);
+		taskLabel->setText("Receiving events");
+	});
+	connect(reply, &QNetworkReply::finished, progress, &QProgressBar::deleteLater);
+	connect(reply, &QNetworkReply::finished, taskLabel, &QProgressBar::deleteLater);
 }
 
 
@@ -114,8 +129,8 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 	auto error = reply->error();
 	if (error == QNetworkReply::NoError)
 	{
-		auto duration = reply->property("request started at").toDateTime().msecsTo(QDateTime::currentDateTime());
-		qDebug() << "request finished after" << duration << "ms";
+		hideDetailsView();
+
 		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
 		QJsonObject obj(doc.object());
 
@@ -125,7 +140,6 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 		QJsonArray events = obj["events"].toArray();
 		m_logModel->setLogs(events.toVariantList());
 		m_widget->logsTable->resizeColumnsToContents();
-		m_widget->logsTable->resizeRowsToContents();
 
 		QLineSeries* countSeries = new QLineSeries();
 		QVariantMap counts = obj["counts"].toObject().toVariantMap();
@@ -162,6 +176,7 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 	{
 		qDebug() << "request error:" << error << reply->readAll();
 	}
+	setInputsEnabled(true);
 }
 
 
@@ -363,4 +378,11 @@ void QStuffMainWindow::saveView()
 		settings.setValue("start", start);
 		settings.setValue("end", end);
 	}
+}
+
+
+void QStuffMainWindow::setInputsEnabled(bool enabled)
+{
+	m_widget->queryInputCombo->setEnabled(enabled);
+	m_widget->timerangeCombo->setEnabled(enabled);
 }

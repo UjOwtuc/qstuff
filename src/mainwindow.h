@@ -28,6 +28,7 @@ public slots:
 	void hideDetailsView();
 	void loadView(const QString& name);
 	void saveView();
+	void setInputsEnabled(bool enabled);
 
 protected slots:
 	void request_finished(QNetworkReply* reply);
