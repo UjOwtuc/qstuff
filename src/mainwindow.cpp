@@ -14,12 +14,44 @@
 #include <QJsonArray>
 #include <QStandardItemModel>
 #include <QTimer>
-#include <QSignalMapper>
 #include <QSettings>
 
 #include <QtCharts>
 
 #include "ui_mainwindow.h"
+
+
+QString formatDuration(const QDateTime& start, const QDateTime& end)
+{
+	QStringList result;
+	quint64 difference = start.secsTo(end);
+	if (difference >= 3600 * 24)
+	{
+		quint64 days = difference / (3600 * 24);
+		result << QString("%1 days").arg(days);
+		difference %= 3600 * 24;
+	}
+
+	if (difference >= 3600 || (result.size() && difference > 0))
+	{
+		int hours = difference / 3600;
+		result << QString("%1 hours").arg(hours);
+		difference %= 3600;
+	}
+
+	if (difference >= 60 || (result.size() && difference > 0))
+	{
+		int minutes = difference / 60;
+		result << QString("%1 minutes").arg(minutes);
+		difference %= 60;
+	}
+
+	if (difference > 0 || result.isEmpty())
+		result << QString("%1 seconds").arg(difference);
+
+	return result.join(" ");
+}
+
 
 QStuffMainWindow::QStuffMainWindow()
 	: QMainWindow()
@@ -27,10 +59,6 @@ QStuffMainWindow::QStuffMainWindow()
 	m_widget = new Ui::QStuffMainWindow();
 	m_widget->setupUi(this);
 	m_net_access = new QNetworkAccessManager(this);
-
-	QSignalMapper* signalMapper = new QSignalMapper(this);
-	connect(signalMapper, &QSignalMapper::mappedString, this, &QStuffMainWindow::appendSearch);
-	connect(signalMapper, &QSignalMapper::mappedInt, this, &QStuffMainWindow::toggleKeyColumn);
 
 	m_top_fields_model = new QStandardItemModel();
 	m_widget->keysTree->setModel(m_top_fields_model);
@@ -101,6 +129,8 @@ void QStuffMainWindow::search()
 	if (start.msecsTo(end) > 0)
 	{
 		setInputsEnabled(false);
+		m_widget->statusbar->clearMessage();
+
 		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("query", m_widget->queryInputCombo->currentText());
@@ -123,6 +153,8 @@ void QStuffMainWindow::search()
 		});
 		connect(reply, &QNetworkReply::finished, progress, &QProgressBar::deleteLater);
 		connect(reply, &QNetworkReply::finished, taskLabel, &QProgressBar::deleteLater);
+
+		reply->setProperty("duration string", formatDuration(start, end));
 	}
 }
 
@@ -147,7 +179,7 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 		m_logModel->setLogs(events.toVariantList());
 		m_widget->logsTable->resizeColumnsToContents();
 
-		m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg("time"));
+		m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg(reply->property("duration string").toString()));
 		QLineSeries* countSeries = new QLineSeries();
 		QVariantMap counts = obj["counts"].toObject().toVariantMap();
 		auto end = counts.constEnd();
