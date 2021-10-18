@@ -99,10 +99,13 @@ QStuffMainWindow::QStuffMainWindow()
 		search();
 	});
 
+	loadQueryHistory();
+
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
 	connect(m_net_access, &QNetworkAccessManager::finished, this, &QStuffMainWindow::request_finished);
 	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
 	connect(m_widget->timerangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::currentTimerangeChanged);
+	connect(m_widget->queryInputCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::search);
 	connect(m_widget->hideDetailsButton, &QToolButton::clicked, this, &QStuffMainWindow::hideDetailsView);
 
 	QAction* refresh = new QAction(this);
@@ -194,7 +197,6 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 			m_widget->queryInputCombo->addItem(queryText);
 
 		hideDetailsView();
-
 		QJsonParseError parseError;
 		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
 		if (parseError.error == QJsonParseError::NoError)
@@ -260,6 +262,8 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 		case Timerange:
 			m_widget->timerangeCombo->setFocus();
 			break;
+		case Other:
+			break;
 	}
 }
 
@@ -287,6 +291,38 @@ void QStuffMainWindow::setKeys(const QJsonObject& keys)
 		rootItem->appendRow(item);
 	}
 	m_widget->keysTree->resizeColumnToContents(0);
+}
+
+
+void QStuffMainWindow::closeEvent(QCloseEvent* /*event*/)
+{
+	saveQueryHistory();
+}
+
+
+void QStuffMainWindow::saveQueryHistory()
+{
+	QSettings settings;
+	settings.beginWriteArray("query_history", m_widget->queryInputCombo->count());
+	for (int i=0; i<m_widget->queryInputCombo->count(); ++i)
+	{
+		settings.setArrayIndex(i);
+		settings.setValue("query", m_widget->queryInputCombo->itemText(i));
+	}
+	settings.endArray();
+}
+
+
+void QStuffMainWindow::loadQueryHistory()
+{
+	QSettings settings;
+	int size = settings.beginReadArray("query_history");
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		m_widget->queryInputCombo->addItem(settings.value("query").toString());
+	}
+	settings.endArray();
 }
 
 

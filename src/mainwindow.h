@@ -36,6 +36,9 @@ protected slots:
 
 protected:
 	void setKeys(const QJsonObject& keys);
+	void closeEvent(QCloseEvent* /*event*/) override;
+	void saveQueryHistory();
+	void loadQueryHistory();
 
 private:
 	Ui::QStuffMainWindow* m_widget;
