@@ -278,6 +278,13 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 void QStuffMainWindow::setKeys(const QJsonObject& keys)
 {
 	auto rootItem = m_top_fields_model->invisibleRootItem();
+	QStringList expandedKeys;
+	for (int row=0; row<rootItem->rowCount(); ++row)
+	{
+		if (m_widget->keysTree->isExpanded(m_keysProxy->mapFromSource(m_top_fields_model->index(row, 0, QModelIndex()))))
+			expandedKeys << rootItem->child(row)->data(Qt::DisplayRole).toString();
+	}
+
 	rootItem->removeRows(0, rootItem->rowCount());
 
 	auto keymap = keys.toVariantMap();
@@ -300,6 +307,9 @@ void QStuffMainWindow::setKeys(const QJsonObject& keys)
 			item->appendRow({value, percentage});
 		}
 		rootItem->appendRow(item);
+
+		if (expandedKeys.contains(it.key()))
+			m_widget->keysTree->expand(m_keysProxy->mapFromSource(item->index()));
 	}
 	m_widget->keysTree->resizeColumnToContents(0);
 	m_keysProxy->sort(0);
