@@ -5,7 +5,7 @@ name: Debian Package
 "on":
   push:
     branches:
-      - packaging
+      - main
 
 jobs:
   build:
