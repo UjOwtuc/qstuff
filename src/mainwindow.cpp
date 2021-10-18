@@ -210,6 +210,11 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 		m_widget->countGraph->setChart(chart);
 		m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
 		m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand);
+
+		connect(xAxis, &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
+			int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
+			m_widget->timerangeCombo->setCurrentIndex(index);
+		});
 	}
 	else
 	{
