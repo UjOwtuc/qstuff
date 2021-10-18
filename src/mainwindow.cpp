@@ -21,6 +21,17 @@
 #include "ui_mainwindow.h"
 
 
+static const char *clearLineXpm[]={
+"15 5 2 1",
+"# c #000000",
+". c #ffffff",
+".....###..#...#",
+"..####.....#.#.",
+"###.........#..",
+"..####.....#.#.",
+".....###..#...#"};
+
+
 QString formatDuration(const QDateTime& start, const QDateTime& end)
 {
 	QStringList result;
@@ -81,6 +92,13 @@ QStuffMainWindow::QStuffMainWindow()
 	m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Years), TimeSpec());
 	m_widget->timerangeCombo->setModel(m_timerangeModel);
 
+	QIcon clearIcon = QIcon::fromTheme("edit-clear", QIcon(QPixmap(clearLineXpm)));
+	QAction* clearQuery = m_widget->queryInputCombo->lineEdit()->addAction(clearIcon, QLineEdit::TrailingPosition);;
+	connect(clearQuery, &QAction::triggered, [this]{
+		m_widget->queryInputCombo->lineEdit()->clear();
+		search();
+	});
+
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
 	connect(m_net_access, &QNetworkAccessManager::finished, this, &QStuffMainWindow::request_finished);
 	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
@@ -128,6 +146,13 @@ void QStuffMainWindow::search()
 
 	if (start.msecsTo(end) > 0)
 	{
+		if (focusWidget() == m_widget->timerangeCombo)
+			m_lastInputFocus = Timerange;
+		else if (focusWidget() == m_widget->queryInputCombo)
+			m_lastInputFocus = Query;
+		else
+			m_lastInputFocus = Other;
+
 		setInputsEnabled(false);
 		m_widget->statusbar->clearMessage();
 
@@ -164,63 +189,78 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 	auto error = reply->error();
 	if (error == QNetworkReply::NoError)
 	{
+		auto queryText = m_widget->queryInputCombo->currentText();
+		if (m_widget->queryInputCombo->findText(queryText) < 0)
+			m_widget->queryInputCombo->addItem(queryText);
+
 		hideDetailsView();
 
 		QJsonParseError parseError;
 		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
-		qDebug() << "json parse error:" << parseError.errorString();
-
-		QJsonObject obj(doc.object());
-
-		QJsonObject top_fields = obj["fields"].toObject();
-		setKeys(top_fields);
-
-		QJsonArray events = obj["events"].toArray();
-		m_logModel->setLogs(events.toVariantList());
-		m_widget->logsTable->resizeColumnsToContents();
-
-		m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg(reply->property("duration string").toString()));
-		QLineSeries* countSeries = new QLineSeries();
-		QVariantMap counts = obj["counts"].toObject().toVariantMap();
-		auto end = counts.constEnd();
-		for (auto it=counts.constBegin(); it!=end; ++it)
+		if (parseError.error == QJsonParseError::NoError)
 		{
-			QDateTime dt = QDateTime::fromString(it.key(), Qt::ISODate);
-			int count = it.value().toInt();
-			countSeries->append(dt.toMSecsSinceEpoch(), count);
+			QJsonObject obj(doc.object());
+			QJsonObject top_fields = obj["fields"].toObject();
+			setKeys(top_fields);
+
+			QJsonArray events = obj["events"].toArray();
+			m_logModel->setLogs(events.toVariantList());
+			m_widget->logsTable->resizeColumnsToContents();
+
+			m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg(reply->property("duration string").toString()));
+			QLineSeries* countSeries = new QLineSeries();
+			QVariantMap counts = obj["counts"].toObject().toVariantMap();
+			auto end = counts.constEnd();
+			for (auto it=counts.constBegin(); it!=end; ++it)
+			{
+				QDateTime dt = QDateTime::fromString(it.key(), Qt::ISODate);
+				int count = it.value().toInt();
+				countSeries->append(dt.toMSecsSinceEpoch(), count);
+			}
+			QChart* chart = new QChart();
+			chart->addSeries(countSeries);
+			chart->legend()->hide();
+
+			QDateTimeAxis* xAxis = new QDateTimeAxis();
+			xAxis->setTickCount(10);
+			xAxis->setFormat("HH:mm");
+			xAxis->setTitleText("Time");
+			chart->addAxis(xAxis, Qt::AlignBottom);
+			countSeries->attachAxis(xAxis);
+
+			QValueAxis* yAxis = new QValueAxis;
+			yAxis->setLabelFormat("%i");
+			yAxis->setTitleText("Event count");
+			chart->addAxis(yAxis, Qt::AlignLeft);
+			countSeries->attachAxis(yAxis);
+			chart->layout()->setContentsMargins(0, 0, 0, 0);
+			chart->setMargins(QMargins());
+			m_widget->countGraph->setChart(chart);
+			m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
+			m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand);
+
+			connect(xAxis, &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
+				int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
+				m_widget->timerangeCombo->setCurrentIndex(index);
+			});
 		}
-		QChart* chart = new QChart();
-		chart->addSeries(countSeries);
-		chart->legend()->hide();
-
-		QDateTimeAxis* xAxis = new QDateTimeAxis();
-		xAxis->setTickCount(10);
-		xAxis->setFormat("HH:mm");
-		xAxis->setTitleText("Time");
-		chart->addAxis(xAxis, Qt::AlignBottom);
-		countSeries->attachAxis(xAxis);
-
-		QValueAxis* yAxis = new QValueAxis;
-		yAxis->setLabelFormat("%i");
-		yAxis->setTitleText("Event count");
-		chart->addAxis(yAxis, Qt::AlignLeft);
-		countSeries->attachAxis(yAxis);
-		chart->layout()->setContentsMargins(0, 0, 0, 0);
-		chart->setMargins(QMargins());
-		m_widget->countGraph->setChart(chart);
-		m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
-		m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand);
-
-		connect(xAxis, &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
-			int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
-			m_widget->timerangeCombo->setCurrentIndex(index);
-		});
+		else
+			qDebug() << "json parse error:" << parseError.errorString();
 	}
 	else
 	{
 		qDebug() << "request error:" << error << reply->readAll();
 	}
 	setInputsEnabled(true);
+	switch (m_lastInputFocus)
+	{
+		case Query:
+			m_widget->queryInputCombo->setFocus();
+			break;
+		case Timerange:
+			m_widget->timerangeCombo->setFocus();
+			break;
+	}
 }
 
 

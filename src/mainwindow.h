@@ -16,6 +16,7 @@ class TimerangeModel;
 class QStuffMainWindow : public QMainWindow
 {
 public:
+	enum LastInputFocus { Query, Timerange, Other };
 	QStuffMainWindow();
 
 public slots:
@@ -42,6 +43,7 @@ private:
 	QStandardItemModel* m_top_fields_model;
 	LogModel* m_logModel;
 	TimerangeModel* m_timerangeModel;
+	LastInputFocus m_lastInputFocus;
 };
 
 #endif // MAINQINDOW_H
