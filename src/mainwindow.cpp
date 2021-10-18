@@ -4,6 +4,7 @@
 #include "timeinputdialog.h"
 #include "timerangemodel.h"
 #include "saveviewdialog.h"
+#include "keyfilterproxymodel.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -15,6 +16,7 @@
 #include <QStandardItemModel>
 #include <QTimer>
 #include <QSettings>
+#include <QSortFilterProxyModel>
 
 #include <QtCharts>
 
@@ -72,10 +74,15 @@ QStuffMainWindow::QStuffMainWindow()
 	m_net_access = new QNetworkAccessManager(this);
 
 	m_top_fields_model = new QStandardItemModel();
-	m_widget->keysTree->setModel(m_top_fields_model);
+	m_keysProxy = new KeyFilterProxyModel(this);
+	m_keysProxy->setSourceModel(m_top_fields_model);
+	m_keysProxy->setSortRole(Qt::UserRole);
+	m_widget->keysTree->sortByColumn(0, Qt::AscendingOrder);
+	m_widget->keysTree->setModel(m_keysProxy);
 	m_widget->keysTree->setItemDelegateForColumn(1, new PercentBarDelegate(500));
 	m_top_fields_model->setHorizontalHeaderLabels({"Key", "Percentage"});
 	connect(m_widget->keysTree, &QTreeView::customContextMenuRequested, this, &QStuffMainWindow::showKeysContextMenu);
+	connect(m_widget->filterKeysEdit, &QLineEdit::textChanged, m_keysProxy, &QSortFilterProxyModel::setFilterWildcard);
 
 	m_logModel = new LogModel({"hostname", "programname", "msg"});
 	m_widget->logsTable->setModel(m_logModel);
@@ -279,18 +286,23 @@ void QStuffMainWindow::setKeys(const QJsonObject& keys)
 	for (auto it=keymap.begin(); it!=end; ++it, ++row)
 	{
 		QStandardItem* item = new QStandardItem(it.key());
-		item->setEditable(false);
+		item->setData(it.key(), Qt::UserRole);
+
 		QVariantMap values = it.value().toMap();
 		auto valueEnd = values.constEnd();
 		for (auto valueIt=values.constBegin(); valueIt!=valueEnd; ++valueIt)
 		{
 			QStandardItem* value = new QStandardItem(valueIt.key());
 			QStandardItem* percentage = new QStandardItem(valueIt.value().toString());
+			int percentValue = valueIt.value().toInt();
+			value->setData(1000 - percentValue, Qt::UserRole);
+			percentage->setData(percentValue, Qt::UserRole);
 			item->appendRow({value, percentage});
 		}
 		rootItem->appendRow(item);
 	}
 	m_widget->keysTree->resizeColumnToContents(0);
+	m_keysProxy->sort(0);
 }
 
 
@@ -409,7 +421,7 @@ void QStuffMainWindow::toggleKeyColumn(int keyIndex)
 
 void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 {
-	QModelIndex index = m_widget->keysTree->indexAt(point);
+	QModelIndex index = m_keysProxy->mapToSource(m_widget->keysTree->indexAt(point));
 	if (index.isValid())
 	{
 		QMenu* contextMenu = new QMenu(this);

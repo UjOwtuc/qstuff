@@ -12,6 +12,7 @@ class QStandardItemModel;
 class QItemSelection;
 class LogModel;
 class TimerangeModel;
+class QSortFilterProxyModel;
 
 class QStuffMainWindow : public QMainWindow
 {
@@ -47,6 +48,7 @@ private:
 	LogModel* m_logModel;
 	TimerangeModel* m_timerangeModel;
 	LastInputFocus m_lastInputFocus;
+	QSortFilterProxyModel* m_keysProxy;
 };
 
 #endif // MAINQINDOW_H
