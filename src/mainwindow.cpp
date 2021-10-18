@@ -92,35 +92,38 @@ QStuffMainWindow::QStuffMainWindow()
 
 void QStuffMainWindow::search()
 {
-	setInputsEnabled(false);
 	QUrlQuery queryItems;
 	auto timerange = m_widget->timerangeCombo->currentData(Qt::UserRole).value<QPair<TimeSpec, TimeSpec>>();
 
 	QDateTime start = timerange.first.toDateTime();
 	QDateTime end = timerange.second.toDateTime();
 
-	queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
-	queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
-	queryItems.addQueryItem("query", m_widget->queryInputCombo->currentText());
-	QUrl url("http://localhost:8000/search");
-	url.setQuery(queryItems);
-	QNetworkRequest req(url);
-	auto reply = m_net_access->get(req);
+	if (start.msecsTo(end) > 0)
+	{
+		setInputsEnabled(false);
+		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
+		queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
+		queryItems.addQueryItem("query", m_widget->queryInputCombo->currentText());
+		QUrl url("http://localhost:8080/events");
+		url.setQuery(queryItems);
+		QNetworkRequest req(url);
+		auto reply = m_net_access->get(req);
 
-	QLabel* taskLabel = new QLabel("Waiting for response headers", m_widget->statusbar);
-	m_widget->statusbar->addWidget(taskLabel);
+		QLabel* taskLabel = new QLabel("Waiting for response headers", m_widget->statusbar);
+		m_widget->statusbar->addWidget(taskLabel);
 
-	QProgressBar* progress = new QProgressBar(m_widget->statusbar);
-	progress->setRange(0, 0);
-	m_widget->statusbar->addWidget(progress);
+		QProgressBar* progress = new QProgressBar(m_widget->statusbar);
+		progress->setRange(0, 0);
+		m_widget->statusbar->addWidget(progress);
 
-	connect(reply, &QNetworkReply::downloadProgress, [progress,taskLabel](quint64 received, quint64 total){
-		progress->setMaximum(total);
-		progress->setValue(received);
-		taskLabel->setText("Receiving events");
-	});
-	connect(reply, &QNetworkReply::finished, progress, &QProgressBar::deleteLater);
-	connect(reply, &QNetworkReply::finished, taskLabel, &QProgressBar::deleteLater);
+		connect(reply, &QNetworkReply::downloadProgress, [progress,taskLabel](quint64 received, quint64 total){
+			progress->setMaximum(total);
+			progress->setValue(received);
+			taskLabel->setText("Receiving events");
+		});
+		connect(reply, &QNetworkReply::finished, progress, &QProgressBar::deleteLater);
+		connect(reply, &QNetworkReply::finished, taskLabel, &QProgressBar::deleteLater);
+	}
 }
 
 
@@ -131,7 +134,10 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 	{
 		hideDetailsView();
 
-		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+		QJsonParseError parseError;
+		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
+		qDebug() << "json parse error:" << parseError.errorString();
+
 		QJsonObject obj(doc.object());
 
 		QJsonObject top_fields = obj["fields"].toObject();
@@ -141,6 +147,7 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 		m_logModel->setLogs(events.toVariantList());
 		m_widget->logsTable->resizeColumnsToContents();
 
+		m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg("time"));
 		QLineSeries* countSeries = new QLineSeries();
 		QVariantMap counts = obj["counts"].toObject().toVariantMap();
 		auto end = counts.constEnd();
