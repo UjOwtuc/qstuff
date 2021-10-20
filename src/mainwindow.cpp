@@ -5,6 +5,7 @@
 #include "timerangemodel.h"
 #include "saveviewdialog.h"
 #include "keyfilterproxymodel.h"
+#include "countschart.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -18,7 +19,8 @@
 #include <QSettings>
 #include <QSortFilterProxyModel>
 
-#include <QtCharts>
+#include <QtCharts/QDateTimeAxis>
+#include <QtCharts/QChart>
 
 #include "ui_mainwindow.h"
 
@@ -71,33 +73,36 @@ QStuffMainWindow::QStuffMainWindow()
 {
 	m_widget = new Ui::QStuffMainWindow();
 	m_widget->setupUi(this);
-	m_net_access = new QNetworkAccessManager(this);
+	m_netAccess = new QNetworkAccessManager(this);
 
-	m_top_fields_model = new QStandardItemModel();
+	m_keysModel = new QStandardItemModel();
 	m_keysProxy = new KeyFilterProxyModel(this);
-	m_keysProxy->setSourceModel(m_top_fields_model);
+	m_keysProxy->setSourceModel(m_keysModel);
 	m_keysProxy->setSortRole(Qt::UserRole);
 	m_widget->keysTree->sortByColumn(0, Qt::AscendingOrder);
 	m_widget->keysTree->setModel(m_keysProxy);
 	m_widget->keysTree->setItemDelegateForColumn(1, new PercentBarDelegate(500));
-	m_top_fields_model->setHorizontalHeaderLabels({"Key", "Percentage"});
+	m_keysModel->setHorizontalHeaderLabels({"Key", "Percentage"});
 	connect(m_widget->keysTree, &QTreeView::customContextMenuRequested, this, &QStuffMainWindow::showKeysContextMenu);
 	connect(m_widget->filterKeysEdit, &QLineEdit::textChanged, m_keysProxy, &QSortFilterProxyModel::setFilterWildcard);
 
-	m_logModel = new LogModel({"hostname", "programname", "msg"});
+	QSettings settings;
+	m_logModel = new LogModel(settings.value("default_columns", QStringList({"hostname", "programname", "msg"})).toStringList());
 	m_widget->logsTable->setModel(m_logModel);
 
 	hideDetailsView();
 
 	m_timerangeModel = new TimerangeModel(this);
-	m_timerangeModel->addChoice(TimeSpec(15, TimeSpec::Minutes), TimeSpec());
-	m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Hours), TimeSpec());
-	m_timerangeModel->addChoice(TimeSpec(4, TimeSpec::Hours), TimeSpec());
-	m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Days), TimeSpec());
-	m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Weeks), TimeSpec());
-	m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Months), TimeSpec());
-	m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Years), TimeSpec());
 	m_widget->timerangeCombo->setModel(m_timerangeModel);
+
+	m_countsChart = new CountsChart(this);
+	m_widget->countGraph->setChart(m_countsChart->chart());
+	m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
+	m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand);
+	connect(m_countsChart->xAxis(), &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
+		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
+		m_widget->timerangeCombo->setCurrentIndex(index);
+	});
 
 	QIcon clearIcon = QIcon::fromTheme("edit-clear", QIcon(QPixmap(clearLineXpm)));
 	QAction* clearQuery = m_widget->queryInputCombo->lineEdit()->addAction(clearIcon, QLineEdit::TrailingPosition);;
@@ -106,13 +111,10 @@ QStuffMainWindow::QStuffMainWindow()
 		search();
 	});
 
-	loadQueryHistory();
-
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
-	connect(m_net_access, &QNetworkAccessManager::finished, this, &QStuffMainWindow::request_finished);
+	connect(m_netAccess, &QNetworkAccessManager::finished, this, &QStuffMainWindow::requestFinished);
 	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
 	connect(m_widget->timerangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::currentTimerangeChanged);
-	connect(m_widget->queryInputCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::search);
 	connect(m_widget->hideDetailsButton, &QToolButton::clicked, this, &QStuffMainWindow::hideDetailsView);
 
 	QAction* refresh = new QAction(this);
@@ -125,14 +127,12 @@ QStuffMainWindow::QStuffMainWindow()
 	connect(hideDetails, &QAction::triggered, this, &QStuffMainWindow::hideDetailsView);
 	addAction(hideDetails);
 
-	QTimer::singleShot(0, this, &QStuffMainWindow::search);
-
 	connect(m_widget->action_saveView, &QAction::triggered, this, &QStuffMainWindow::saveView);
 	connect(m_widget->action_resetView, &QAction::triggered, [this]{
 		m_logModel->setColumns({"hostname", "programname", "msg"});
 		m_widget->logsTable->resizeColumnsToContents();
 	});
-	QSettings settings;
+
 	settings.beginGroup("views");
 	for (auto name : settings.childGroups())
 	{
@@ -143,6 +143,11 @@ QStuffMainWindow::QStuffMainWindow()
 		m_widget->menu_View->addAction(loadViewAction);
 	}
 	settings.endGroup();
+
+	loadTimerangeChoices();
+	loadQueryHistory();
+
+	QTimer::singleShot(0, this, &QStuffMainWindow::search);
 }
 
 
@@ -154,6 +159,7 @@ void QStuffMainWindow::search()
 	QDateTime start = timerange.first.toDateTime();
 	QDateTime end = timerange.second.toDateTime();
 
+// 	qDebug() << "search from" << start << "to" << end << "for" << m_widget->queryInputCombo->currentText();
 	if (start.msecsTo(end) > 0)
 	{
 		if (focusWidget() == m_widget->timerangeCombo)
@@ -172,7 +178,7 @@ void QStuffMainWindow::search()
 		QUrl url("http://localhost:8080/events");
 		url.setQuery(queryItems);
 		QNetworkRequest req(url);
-		auto reply = m_net_access->get(req);
+		auto reply = m_netAccess->get(req);
 
 		QLabel* taskLabel = new QLabel("Waiting for response headers", m_widget->statusbar);
 		m_widget->statusbar->addWidget(taskLabel);
@@ -194,72 +200,38 @@ void QStuffMainWindow::search()
 }
 
 
-void QStuffMainWindow::request_finished(QNetworkReply* reply)
+void QStuffMainWindow::requestFinished(QNetworkReply* reply)
 {
+	if (reply->error() != QNetworkReply::NoError)
+	{
+
+	}
 	auto error = reply->error();
 	if (error == QNetworkReply::NoError)
 	{
-		auto queryText = m_widget->queryInputCombo->currentText();
-		if (m_widget->queryInputCombo->findText(queryText) < 0)
-			m_widget->queryInputCombo->addItem(queryText);
-
 		hideDetailsView();
 		QJsonParseError parseError;
 		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
 		if (parseError.error == QJsonParseError::NoError)
 		{
 			QJsonObject obj(doc.object());
-			QJsonObject top_fields = obj["fields"].toObject();
-			setKeys(top_fields);
+			QJsonObject topFields = obj["fields"].toObject();
+			setKeys(topFields);
 
 			QJsonArray events = obj["events"].toArray();
 			m_logModel->setLogs(events.toVariantList());
 			m_widget->logsTable->resizeColumnsToContents();
 
 			m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg(reply->property("duration string").toString()));
-			QLineSeries* countSeries = new QLineSeries();
 			QVariantMap counts = obj["counts"].toObject().toVariantMap();
-			auto end = counts.constEnd();
-			for (auto it=counts.constBegin(); it!=end; ++it)
-			{
-				QDateTime dt = QDateTime::fromString(it.key(), Qt::ISODate);
-				int count = it.value().toInt();
-				countSeries->append(dt.toMSecsSinceEpoch(), count);
-			}
-			QChart* chart = new QChart();
-			chart->addSeries(countSeries);
-			chart->legend()->hide();
-
-			QDateTimeAxis* xAxis = new QDateTimeAxis();
-			xAxis->setTickCount(10);
-			xAxis->setFormat("HH:mm");
-			xAxis->setTitleText("Time");
-			chart->addAxis(xAxis, Qt::AlignBottom);
-			countSeries->attachAxis(xAxis);
-
-			QValueAxis* yAxis = new QValueAxis;
-			yAxis->setLabelFormat("%i");
-			yAxis->setTitleText("Event count");
-			chart->addAxis(yAxis, Qt::AlignLeft);
-			countSeries->attachAxis(yAxis);
-			chart->layout()->setContentsMargins(0, 0, 0, 0);
-			chart->setMargins(QMargins());
-			m_widget->countGraph->setChart(chart);
-			m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
-			m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand);
-
-			connect(xAxis, &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
-				int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
-				m_widget->timerangeCombo->setCurrentIndex(index);
-			});
+			m_countsChart->plotCounts(counts);
 		}
 		else
-			qDebug() << "json parse error:" << parseError.errorString();
+			QMessageBox::warning(this, "Malformed Reply", QString("Could not parse server's reply: %1").arg(parseError.errorString()));
 	}
 	else
-	{
-		qDebug() << "request error:" << error << reply->readAll();
-	}
+		QMessageBox::warning(this, "Network Error", QString("Network request failed: %1").arg(reply->errorString()));
+
 	setInputsEnabled(true);
 	switch (m_lastInputFocus)
 	{
@@ -277,11 +249,11 @@ void QStuffMainWindow::request_finished(QNetworkReply* reply)
 
 void QStuffMainWindow::setKeys(const QJsonObject& keys)
 {
-	auto rootItem = m_top_fields_model->invisibleRootItem();
+	auto rootItem = m_keysModel->invisibleRootItem();
 	QStringList expandedKeys;
 	for (int row=0; row<rootItem->rowCount(); ++row)
 	{
-		if (m_widget->keysTree->isExpanded(m_keysProxy->mapFromSource(m_top_fields_model->index(row, 0, QModelIndex()))))
+		if (m_widget->keysTree->isExpanded(m_keysProxy->mapFromSource(m_keysModel->index(row, 0, QModelIndex()))))
 			expandedKeys << rootItem->child(row)->data(Qt::DisplayRole).toString();
 	}
 
@@ -337,6 +309,7 @@ void QStuffMainWindow::saveQueryHistory()
 
 void QStuffMainWindow::loadQueryHistory()
 {
+	QSignalBlocker blocker(m_widget->queryInputCombo);
 	QSettings settings;
 	int size = settings.beginReadArray("query_history");
 	for (int i=0; i<size; ++i)
@@ -345,6 +318,34 @@ void QStuffMainWindow::loadQueryHistory()
 		m_widget->queryInputCombo->addItem(settings.value("query").toString());
 	}
 	settings.endArray();
+}
+
+
+void QStuffMainWindow::loadTimerangeChoices()
+{
+	QSignalBlocker blocker(m_widget->timerangeCombo);
+	QSettings settings;
+	int size = settings.beginReadArray("timerange_choices");
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		TimeSpec start = TimeSpec::deserialize(settings.value("start").toStringList());
+		TimeSpec end = TimeSpec::deserialize(settings.value("end").toStringList());
+		m_timerangeModel->addChoice(start, end);
+	}
+	settings.endArray();
+
+	if (size < 1)
+	{
+		m_timerangeModel->addChoice(TimeSpec(15, TimeSpec::Minutes), TimeSpec());
+		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Hours), TimeSpec());
+		m_timerangeModel->addChoice(TimeSpec(4, TimeSpec::Hours), TimeSpec());
+		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Days), TimeSpec());
+		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Weeks), TimeSpec());
+		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Months), TimeSpec());
+		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Years), TimeSpec());
+	}
+	m_widget->timerangeCombo->setCurrentIndex(0);
 }
 
 
@@ -412,19 +413,27 @@ void QStuffMainWindow::currentTimerangeChanged(int current)
 
 void QStuffMainWindow::appendSearch(const QString& append)
 {
-	qDebug() << "append" << append;
 	QString nextQuery(append);
 	QString currentQuery = m_widget->queryInputCombo->currentText();
 	if (! currentQuery.isEmpty())
 		nextQuery = QString("(%1) and %2").arg(currentQuery).arg(append);
-	m_widget->queryInputCombo->setCurrentText(nextQuery);
+
+	int index = m_widget->queryInputCombo->findText(nextQuery);
+	if  (index < 0)
+	{
+		m_widget->queryInputCombo->addItem(nextQuery);
+		index = m_widget->queryInputCombo->findText(nextQuery);
+	}
+
+	QSignalBlocker blocker(m_widget->queryInputCombo);
+	m_widget->queryInputCombo->setCurrentIndex(index);
 	search();
 }
 
 
 void QStuffMainWindow::toggleKeyColumn(int keyIndex)
 {
-	QString keyName = m_top_fields_model->item(keyIndex, 0)->text();
+	QString keyName = m_keysModel->item(keyIndex, 0)->text();
 	m_logModel->toggleColumn(keyName);
 }
 
@@ -435,12 +444,11 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 	if (index.isValid())
 	{
 		QMenu* contextMenu = new QMenu(this);
-		if (m_top_fields_model->parent(index) == QModelIndex())
+		if (m_keysModel->parent(index) == QModelIndex())
 		{
-			QString key = m_top_fields_model->data(m_top_fields_model->index(index.row(), 0, index.parent()), Qt::DisplayRole).toString();
-			qDebug() << "key" << key;
+			QString key = m_keysModel->data(m_keysModel->index(index.row(), 0, index.parent()), Qt::DisplayRole).toString();
 			QAction* toggle = new QAction("Toggle column in log view", contextMenu);
-			connect(toggle, &QAction::triggered, [this,key]{
+			connect(toggle, &QAction::triggered, [this, key]{
 				m_logModel->toggleColumn(key);
 				m_widget->logsTable->resizeColumnsToContents();
 			});
@@ -448,14 +456,18 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 		}
 		else
 		{
-			QString key = m_top_fields_model->data(index.parent(), Qt::DisplayRole).toString();
-			QString value = m_top_fields_model->data(m_top_fields_model->index(index.row(), 0, index.parent()), Qt::DisplayRole).toString();
-			qDebug() << "value" << value;
+			QString key = m_keysModel->data(index.parent(), Qt::DisplayRole).toString();
+			QString value = m_keysModel->data(m_keysModel->index(index.row(), 0, index.parent()), Qt::DisplayRole).toString();
 			QAction* filter = new QAction("Filter for value", contextMenu);
-			connect(filter, &QAction::triggered, [this,key,value]{appendSearch(QString("%1 = \"%2\"").arg(key).arg(value));});
+			connect(filter, &QAction::triggered, [this, key, value]{
+				appendSearch(QString("%1 = \"%2\"").arg(key).arg(value));
+			});
 			contextMenu->addAction(filter);
+
 			QAction* filterNot = new QAction("Filter out value", contextMenu);
-			connect(filterNot, &QAction::triggered, [this,key,value]{appendSearch(QString("%1 != \"%2\"").arg(key).arg(value));});
+			connect(filterNot, &QAction::triggered, [this, key, value]{
+				appendSearch(QString("%1 != \"%2\"").arg(key).arg(value));
+			});
 			contextMenu->addAction(filterNot);
 		}
 		contextMenu->exec(m_widget->keysTree->viewport()->mapToGlobal(point));

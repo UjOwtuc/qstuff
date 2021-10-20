@@ -13,6 +13,7 @@ class QItemSelection;
 class LogModel;
 class TimerangeModel;
 class QSortFilterProxyModel;
+class CountsChart;
 
 class QStuffMainWindow : public QMainWindow
 {
@@ -33,22 +34,24 @@ public slots:
 	void setInputsEnabled(bool enabled);
 
 protected slots:
-	void request_finished(QNetworkReply* reply);
+	void requestFinished(QNetworkReply* reply);
 
 protected:
 	void setKeys(const QJsonObject& keys);
 	void closeEvent(QCloseEvent* /*event*/) override;
 	void saveQueryHistory();
 	void loadQueryHistory();
+	void loadTimerangeChoices();
 
 private:
 	Ui::QStuffMainWindow* m_widget;
-	QNetworkAccessManager* m_net_access;
-	QStandardItemModel* m_top_fields_model;
+	QNetworkAccessManager* m_netAccess;
+	QStandardItemModel* m_keysModel;
 	LogModel* m_logModel;
 	TimerangeModel* m_timerangeModel;
 	LastInputFocus m_lastInputFocus;
 	QSortFilterProxyModel* m_keysProxy;
+	CountsChart* m_countsChart;
 };
 
 #endif // MAINQINDOW_H
