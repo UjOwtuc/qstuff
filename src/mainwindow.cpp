@@ -163,7 +163,7 @@ void QStuffMainWindow::search()
 			if (query.isEmpty())
 				query = input;
 			else
-				query = QString("(%1) and $2").arg(query).arg(input);
+				query = QString("(%1) and %2").arg(query).arg(input);
 		}
 
 		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
