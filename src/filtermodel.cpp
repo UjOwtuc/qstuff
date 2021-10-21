@@ -233,9 +233,6 @@ int FilterModel::addFilter(const FilterExpression& expr)
 			endInsertRows();
 		}
 	}
-
-	if (changed >= 0 && ! expr.isEmpty())
-		emit filtersChanged();
 	return changed;
 }
 
@@ -259,13 +256,12 @@ bool FilterModel::setData(const QModelIndex& index, const QVariant& value, int r
 			case Qt::UserRole:
 				m_filters[index.row()] = value.value<FilterExpression>();
 				dataChanged(index, index);
-				emit filtersChanged();
 				ok = true;
 				break;
 			case Qt::CheckStateRole:
 				m_filters[index.row()].setEnabled(value.toInt() == Qt::Checked);
-				emit filtersChanged();
 				ok = true;
+				emit checkStateChanged(index);
 				break;
 			case Qt::DisplayRole:
 				m_filters[index.row()].setLabel(value.toString());
@@ -285,7 +281,7 @@ const QList<FilterExpression> & FilterModel::filters()
 }
 
 
-void FilterModel::setAllEnabled(bool enabled)
+bool FilterModel::setAllEnabled(bool enabled)
 {
 	int first = -1, last = -1;
 	for (int row=0; row < m_filters.size(); ++row)
@@ -302,31 +298,34 @@ void FilterModel::setAllEnabled(bool enabled)
 	if (first >= 0)
 	{
 		dataChanged(index(first), index(last));
-		emit filtersChanged();
+		return true;
 	}
+	return false;
 }
 
 
-void FilterModel::removeAllFilters()
+bool FilterModel::removeAllFilters()
 {
 	if (m_filters.size())
 	{
 		beginResetModel();
 		m_filters.clear();
 		endResetModel();
-		emit filtersChanged();
+		return true;
 	}
+	return false;
 }
 
 
-void FilterModel::invertFilter(const QModelIndex& index)
+bool FilterModel::invertFilter(const QModelIndex& index)
 {
 	if (index.row() >= 0 && index.row() < m_filters.size())
 	{
 		m_filters[index.row()] = m_filters[index.row()].inverted();
 		dataChanged(index, index);
-		emit filtersChanged();
+		return true;
 	}
+	return false;
 }
 
 

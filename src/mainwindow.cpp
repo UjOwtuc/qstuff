@@ -70,6 +70,50 @@ QString formatDuration(const QDateTime& start, const QDateTime& end)
 }
 
 
+void saveFiltersArray(QSettings& settings, const QList<FilterExpression>& filters)
+{
+	int size = filters.size();
+	settings.beginWriteArray("filters", size);
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		const FilterExpression& filter = filters.at(i);
+		settings.setValue("id", filter.id());
+		settings.setValue("op", filter.op());
+		settings.setValue("value", filter.value());
+		if (filter.label() != filter.toString())
+			settings.setValue("label", filter.label());
+		else
+			settings.setValue("label", QString());
+		settings.setValue("enabled", filter.enabled());
+	}
+	settings.endArray();
+}
+
+
+QList<FilterExpression> loadFiltersArray(QSettings& settings)
+{
+	QList<FilterExpression> filters;
+	int size = settings.beginReadArray("filters");
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		QString id = settings.value("id").toString();
+		FilterExpression::Op op = static_cast<FilterExpression::Op>(settings.value("op").toInt());
+		QString value = settings.value("value").toString();
+		QString label = settings.value("label").toString();
+		bool enabled = settings.value("enabled").toBool();
+
+		FilterExpression expr(id, op, value);
+		expr.setLabel(label);
+		expr.setEnabled(enabled);
+		filters << expr;
+	}
+	settings.endArray();
+	return filters;
+}
+
+
 QStuffMainWindow::QStuffMainWindow()
 	: QMainWindow()
 {
@@ -350,23 +394,7 @@ void QStuffMainWindow::saveFilters()
 	QSettings settings;
 	QList<FilterExpression> filters = m_filterModel->filters();
 	filters.removeAll(FilterExpression());
-
-	int size = filters.size();
-	settings.beginWriteArray("filters", size);
-	for (int i=0; i<size; ++i)
-	{
-		settings.setArrayIndex(i);
-		const FilterExpression& filter = filters.at(i);
-		settings.setValue("id", filter.id());
-		settings.setValue("op", filter.op());
-		settings.setValue("value", filter.value());
-		if (filter.label() != filter.toString())
-			settings.setValue("label", filter.label());
-		else
-			settings.setValue("label", QString());
-		settings.setValue("enabled", filter.enabled());
-	}
-	settings.endArray();
+	saveFiltersArray(settings, filters);
 }
 
 
@@ -449,13 +477,15 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 			value = QString("\"%1\"").arg(value);
 			QAction* filter = new QAction("Filter for value", contextMenu);
 			connect(filter, &QAction::triggered, [this, key, value]{
-				m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value));
+				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value)) >= 0)
+					search();
 			});
 			contextMenu->addAction(filter);
 
 			QAction* filterNot = new QAction("Filter out value", contextMenu);
 			connect(filterNot, &QAction::triggered, [this, key, value]{
-				m_filterModel->addFilter(FilterExpression(key, FilterExpression::Neq, value));
+				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Neq, value)) >= 0)
+					search();
 			});
 			contextMenu->addAction(filterNot);
 		}
@@ -486,6 +516,11 @@ void QStuffMainWindow::loadView(const QString& name)
 		m_widget->timerangeCombo->setCurrentIndex(index);
 	}
 
+	QList<FilterExpression> filters = loadFiltersArray(settings);
+	m_filterModel->setAllEnabled(false);
+	for (auto filter : filters)
+		m_filterModel->addFilter(filter);
+
 	search();
 }
 
@@ -504,6 +539,14 @@ void QStuffMainWindow::saveView()
 		if (dlg.saveQuery())
 			query = m_widget->queryInputCombo->currentText();
 		settings.setValue("query", query);
+
+		QList<FilterExpression> filters;
+		if (dlg.saveFilters())
+		{
+			filters = m_filterModel->filters();
+			filters.removeAll(FilterExpression());
+		}
+		saveFiltersArray(settings, filters);
 
 		QVariant start, end;
 		if (dlg.saveTimerange())
@@ -548,47 +591,39 @@ void QStuffMainWindow::setupFilterView()
 	m_widget->filterList->setItemDelegate(new FilterDelegate(m_keysModel, this));
 
 	QSettings settings;
-	int size = settings.beginReadArray("filters");
-	for (int i=0; i<size; ++i)
-	{
-		settings.setArrayIndex(i);
-		QString id = settings.value("id").toString();
-		FilterExpression::Op op = static_cast<FilterExpression::Op>(settings.value("op").toInt());
-		QString value = settings.value("value").toString();
-		QString label = settings.value("label").toString();
-		bool enabled = settings.value("enabled").toBool();
+	QList<FilterExpression> filters = loadFiltersArray(settings);
+	for (auto filter : filters)
+		m_filterModel->addFilter(filter);
 
-		FilterExpression expr(id, op, value);
-		expr.setLabel(label);
-		expr.setEnabled(enabled);
-		m_filterModel->addFilter(expr);
-	}
-	settings.endArray();
-
-	connect(m_filterModel, &FilterModel::filtersChanged, this, &QStuffMainWindow::search);
+	connect(m_widget->filterList->itemDelegate(), &QAbstractItemDelegate::commitData, this, &QStuffMainWindow::search);
+	connect(m_filterModel, &FilterModel::checkStateChanged, this, &QStuffMainWindow::search);
 	connect(m_widget->addFilterButton, &QToolButton::clicked, [this]{
 		int row = m_filterModel->addFilter(FilterExpression());
 		m_widget->filterList->edit(m_filterModel->index(row));
 	});
 	connect(m_widget->enableAllFiltersButton, &QToolButton::clicked, [this]{
-		m_filterModel->setAllEnabled(true);
+		if(m_filterModel->setAllEnabled(true))
+			search();
 	});
 	connect(m_widget->disableAllFiltersButton, &QToolButton::clicked, [this]{
-		m_filterModel->setAllEnabled(false);
+		if (m_filterModel->setAllEnabled(false))
+			search();
 	});
 	connect(m_widget->removeAllFiltersButton, &QToolButton::clicked, [this]{
-		m_filterModel->removeAllFilters();
+		if (m_filterModel->removeAllFilters())
+			search();
 	});
 
 	connect(m_widget->invertFilterButton, &QToolButton::clicked, [this]{
+		bool changed = false;
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
 		if (! selected.isEmpty())
 		{
-			QSignalBlocker blocker(m_filterModel);
 			for (auto index : selected)
-				m_filterModel->invertFilter(index);
-			search();
+				changed |= m_filterModel->invertFilter(index);
 		}
+		if (changed)
+			search();
 	});
 	connect(m_widget->removeFilterButton, &QToolButton::clicked, [this]{
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();

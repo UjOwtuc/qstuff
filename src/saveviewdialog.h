@@ -14,6 +14,7 @@ public:
 	QString name() const;
 	bool saveQuery() const;
 	bool saveTimerange() const;
+	bool saveFilters() const;
 
 private:
 	Ui::SaveViewDialog* m_widget;

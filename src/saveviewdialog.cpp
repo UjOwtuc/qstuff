@@ -26,3 +26,9 @@ bool SaveViewDialog::saveTimerange() const
 {
 	return m_widget->saveTimerangeCheckbox->isChecked();
 }
+
+
+bool SaveViewDialog::saveFilters() const
+{
+	return m_widget->saveFiltersCheckbox->isChecked();
+}

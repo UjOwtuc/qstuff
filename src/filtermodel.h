@@ -58,13 +58,13 @@ public:
 	Qt::ItemFlags flags(const QModelIndex& index) const;
 	bool setData(const QModelIndex & index, const QVariant & value, int role);
 	const QList<FilterExpression>& filters();
-	void setAllEnabled(bool enabled);
-	void removeAllFilters();
-	void invertFilter(const QModelIndex& index);
+	bool setAllEnabled(bool enabled);
+	bool removeAllFilters();
+	bool invertFilter(const QModelIndex& index);
 	bool removeRows(int row, int count, const QModelIndex& /*parent*/);
 
 signals:
-	void filtersChanged();
+	void checkStateChanged(const QModelIndex& index);
 
 private:
 	QList<FilterExpression> m_filters;
