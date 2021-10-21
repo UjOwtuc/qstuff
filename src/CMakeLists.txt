@@ -8,6 +8,9 @@ set(qstuff_SRCS
 	saveviewdialog.cpp
 	keyfilterproxymodel.cpp
 	countschart.cpp
+	filtermodel.cpp
+	filterdelegate.cpp
+	editfilterwidget.cpp
 )
 add_executable(qstuff ${qstuff_SRCS})
 target_link_libraries(qstuff Qt5::Gui Qt5::Widgets Qt5::Network Qt5::Charts)

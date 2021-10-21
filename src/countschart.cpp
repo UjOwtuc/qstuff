@@ -57,7 +57,6 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 	}
 
 	QSignalBlocker blocker(m_xAxis);
-	qDebug() << "chart range" << minX << maxX;
 	m_xAxis->setRange(minX, maxX);
 	m_yAxis->setRange(minY, maxY);
 }

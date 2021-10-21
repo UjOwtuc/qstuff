@@ -6,6 +6,8 @@
 #include "saveviewdialog.h"
 #include "keyfilterproxymodel.h"
 #include "countschart.h"
+#include "filtermodel.h"
+#include "filterdelegate.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -75,34 +77,21 @@ QStuffMainWindow::QStuffMainWindow()
 	m_widget->setupUi(this);
 	m_netAccess = new QNetworkAccessManager(this);
 
-	m_keysModel = new QStandardItemModel();
-	m_keysProxy = new KeyFilterProxyModel(this);
-	m_keysProxy->setSourceModel(m_keysModel);
-	m_keysProxy->setSortRole(Qt::UserRole);
-	m_widget->keysTree->sortByColumn(0, Qt::AscendingOrder);
-	m_widget->keysTree->setModel(m_keysProxy);
-	m_widget->keysTree->setItemDelegateForColumn(1, new PercentBarDelegate(500));
-	m_keysModel->setHorizontalHeaderLabels({"Key", "Percentage"});
-	connect(m_widget->keysTree, &QTreeView::customContextMenuRequested, this, &QStuffMainWindow::showKeysContextMenu);
-	connect(m_widget->filterKeysEdit, &QLineEdit::textChanged, m_keysProxy, &QSortFilterProxyModel::setFilterWildcard);
+	setupKeysView();
+	setupFilterView();
+	setupChartView();
 
 	QSettings settings;
+	restoreGeometry(settings.value("mainwindow/geometry").toByteArray());
+	if (! restoreState(settings.value("mainwindow/windowState").toByteArray()))
+		setupReasonableDockWidgetPositions();
+
+
 	m_logModel = new LogModel(settings.value("default_columns", QStringList({"hostname", "programname", "msg"})).toStringList());
 	m_widget->logsTable->setModel(m_logModel);
 
-	hideDetailsView();
-
 	m_timerangeModel = new TimerangeModel(this);
 	m_widget->timerangeCombo->setModel(m_timerangeModel);
-
-	m_countsChart = new CountsChart(this);
-	m_widget->countGraph->setChart(m_countsChart->chart());
-	m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
-	m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand);
-	connect(m_countsChart->xAxis(), &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
-		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
-		m_widget->timerangeCombo->setCurrentIndex(index);
-	});
 
 	QIcon clearIcon = QIcon::fromTheme("edit-clear", QIcon(QPixmap(clearLineXpm)));
 	QAction* clearQuery = m_widget->queryInputCombo->lineEdit()->addAction(clearIcon, QLineEdit::TrailingPosition);;
@@ -113,19 +102,14 @@ QStuffMainWindow::QStuffMainWindow()
 
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
 	connect(m_netAccess, &QNetworkAccessManager::finished, this, &QStuffMainWindow::requestFinished);
-	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
 	connect(m_widget->timerangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::currentTimerangeChanged);
-	connect(m_widget->hideDetailsButton, &QToolButton::clicked, this, &QStuffMainWindow::hideDetailsView);
+
+	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
 
 	QAction* refresh = new QAction(this);
 	refresh->setShortcut(Qt::Key_F5);
 	connect(refresh, &QAction::triggered, this, &QStuffMainWindow::search);
 	addAction(refresh);
-
-	QAction* hideDetails = new QAction(this);
-	hideDetails->setShortcut(Qt::Key_Escape);
-	connect(hideDetails, &QAction::triggered, this, &QStuffMainWindow::hideDetailsView);
-	addAction(hideDetails);
 
 	connect(m_widget->action_saveView, &QAction::triggered, this, &QStuffMainWindow::saveView);
 	connect(m_widget->action_resetView, &QAction::triggered, [this]{
@@ -140,7 +124,7 @@ QStuffMainWindow::QStuffMainWindow()
 		connect(loadViewAction, &QAction::triggered, [this,name]{
 			loadView(name);
 		});
-		m_widget->menu_View->addAction(loadViewAction);
+		m_widget->menu_view->addAction(loadViewAction);
 	}
 	settings.endGroup();
 
@@ -172,9 +156,19 @@ void QStuffMainWindow::search()
 		setInputsEnabled(false);
 		m_widget->statusbar->clearMessage();
 
+		QString query = m_filterModel->enabledExpressions().join(" and ");
+		QString input = m_widget->queryInputCombo->currentText();
+		if (! input.isEmpty())
+		{
+			if (query.isEmpty())
+				query = input;
+			else
+				query = QString("(%1) and $2").arg(query).arg(input);
+		}
+
 		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
-		queryItems.addQueryItem("query", m_widget->queryInputCombo->currentText());
+		queryItems.addQueryItem("query", query);
 		QUrl url("http://localhost:8080/events");
 		url.setQuery(queryItems);
 		QNetworkRequest req(url);
@@ -202,14 +196,11 @@ void QStuffMainWindow::search()
 
 void QStuffMainWindow::requestFinished(QNetworkReply* reply)
 {
-	if (reply->error() != QNetworkReply::NoError)
-	{
-
-	}
 	auto error = reply->error();
 	if (error == QNetworkReply::NoError)
 	{
-		hideDetailsView();
+		m_widget->detailsTable->clearContents();
+		m_widget->detailsTable->setRowCount(0);
 		QJsonParseError parseError;
 		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
 		if (parseError.error == QJsonParseError::NoError)
@@ -288,9 +279,14 @@ void QStuffMainWindow::setKeys(const QJsonObject& keys)
 }
 
 
-void QStuffMainWindow::closeEvent(QCloseEvent* /*event*/)
+void QStuffMainWindow::closeEvent(QCloseEvent* event)
 {
 	saveQueryHistory();
+	saveFilters();
+	QSettings settings;
+	settings.setValue("mainwindow/geometry", saveGeometry());
+	settings.setValue("mainwindow/windowState", saveState());
+	QMainWindow::closeEvent(event);
 }
 
 
@@ -349,14 +345,35 @@ void QStuffMainWindow::loadTimerangeChoices()
 }
 
 
+void QStuffMainWindow::saveFilters()
+{
+	QSettings settings;
+	QList<FilterExpression> filters = m_filterModel->filters();
+	filters.removeAll(FilterExpression());
+
+	int size = filters.size();
+	settings.beginWriteArray("filters", size);
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		const FilterExpression& filter = filters.at(i);
+		settings.setValue("id", filter.id());
+		settings.setValue("op", filter.op());
+		settings.setValue("value", filter.value());
+		if (filter.label() != filter.toString())
+			settings.setValue("label", filter.label());
+		else
+			settings.setValue("label", QString());
+		settings.setValue("enabled", filter.enabled());
+	}
+	settings.endArray();
+}
+
+
 void QStuffMainWindow::currentLogItemChanged(const QItemSelection& selected, const QItemSelection& /* deselected */)
 {
 	m_widget->detailsTable->clearContents();
-	if (selected.indexes().isEmpty())
-	{
-		hideDetailsView();
-	}
-	else
+	if (! selected.indexes().isEmpty())
 	{
 		QModelIndex current = selected.indexes().first();
 		auto data = m_logModel->rowData(current.row()).toMap();
@@ -377,18 +394,7 @@ void QStuffMainWindow::currentLogItemChanged(const QItemSelection& selected, con
 		}
 		m_widget->detailsTable->resizeColumnsToContents();
 		m_widget->detailsTable->resizeRowsToContents();
-
-		auto sizes = m_widget->logDetailsSplitter->sizes();
-		if (sizes[1] == 0)
-		{
-			auto height = m_widget->logDetailsSplitter->height() / 2;
-			m_widget->logDetailsSplitter->setSizes({height, height});
-			int horizontalPosition = m_widget->logsTable->horizontalScrollBar()->value();
-			m_widget->logsTable->scrollTo(current, QAbstractItemView::EnsureVisible);
-			m_widget->logsTable->horizontalScrollBar()->setValue(horizontalPosition);
-			m_widget->logsTable->selectionModel()->setCurrentIndex(current, QItemSelectionModel::Select | QItemSelectionModel::Rows);
-			m_widget->logsTable->selectRow(current.row());
-		}
+		m_widget->logDetailsDock->show();
 	}
 }
 
@@ -407,26 +413,6 @@ void QStuffMainWindow::currentTimerangeChanged(int current)
 			m_widget->timerangeCombo->blockSignals(false);
 		}
 	}
-	search();
-}
-
-
-void QStuffMainWindow::appendSearch(const QString& append)
-{
-	QString nextQuery(append);
-	QString currentQuery = m_widget->queryInputCombo->currentText();
-	if (! currentQuery.isEmpty())
-		nextQuery = QString("(%1) and %2").arg(currentQuery).arg(append);
-
-	int index = m_widget->queryInputCombo->findText(nextQuery);
-	if  (index < 0)
-	{
-		m_widget->queryInputCombo->addItem(nextQuery);
-		index = m_widget->queryInputCombo->findText(nextQuery);
-	}
-
-	QSignalBlocker blocker(m_widget->queryInputCombo);
-	m_widget->queryInputCombo->setCurrentIndex(index);
 	search();
 }
 
@@ -458,26 +444,23 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 		{
 			QString key = m_keysModel->data(index.parent(), Qt::DisplayRole).toString();
 			QString value = m_keysModel->data(m_keysModel->index(index.row(), 0, index.parent()), Qt::DisplayRole).toString();
+
+			// TODO: escape quotes in value
+			value = QString("\"%1\"").arg(value);
 			QAction* filter = new QAction("Filter for value", contextMenu);
 			connect(filter, &QAction::triggered, [this, key, value]{
-				appendSearch(QString("%1 = \"%2\"").arg(key).arg(value));
+				m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value));
 			});
 			contextMenu->addAction(filter);
 
 			QAction* filterNot = new QAction("Filter out value", contextMenu);
 			connect(filterNot, &QAction::triggered, [this, key, value]{
-				appendSearch(QString("%1 != \"%2\"").arg(key).arg(value));
+				m_filterModel->addFilter(FilterExpression(key, FilterExpression::Neq, value));
 			});
 			contextMenu->addAction(filterNot);
 		}
 		contextMenu->exec(m_widget->keysTree->viewport()->mapToGlobal(point));
 	}
-}
-
-
-void QStuffMainWindow::hideDetailsView()
-{
-	m_widget->logDetailsSplitter->setSizes({1, 0});
 }
 
 
@@ -539,4 +522,114 @@ void QStuffMainWindow::setInputsEnabled(bool enabled)
 {
 	m_widget->queryInputCombo->setEnabled(enabled);
 	m_widget->timerangeCombo->setEnabled(enabled);
+}
+
+
+void QStuffMainWindow::setupKeysView()
+{
+	m_keysModel = new QStandardItemModel();
+	m_keysProxy = new KeyFilterProxyModel(this);
+	m_keysProxy->setSourceModel(m_keysModel);
+	m_keysProxy->setSortRole(Qt::UserRole);
+	m_widget->keysTree->sortByColumn(0, Qt::AscendingOrder);
+	m_widget->keysTree->setModel(m_keysProxy);
+	m_widget->keysTree->setItemDelegateForColumn(1, new PercentBarDelegate(500));
+	m_keysModel->setHorizontalHeaderLabels({"Key", "Percentage"});
+
+	connect(m_widget->keysTree, &QTreeView::customContextMenuRequested, this, &QStuffMainWindow::showKeysContextMenu);
+	connect(m_widget->filterKeysEdit, &QLineEdit::textChanged, m_keysProxy, &QSortFilterProxyModel::setFilterWildcard);
+}
+
+
+void QStuffMainWindow::setupFilterView()
+{
+	m_filterModel = new FilterModel(this);
+	m_widget->filterList->setModel(m_filterModel);
+	m_widget->filterList->setItemDelegate(new FilterDelegate(m_keysModel, this));
+
+	QSettings settings;
+	int size = settings.beginReadArray("filters");
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		QString id = settings.value("id").toString();
+		FilterExpression::Op op = static_cast<FilterExpression::Op>(settings.value("op").toInt());
+		QString value = settings.value("value").toString();
+		QString label = settings.value("label").toString();
+		bool enabled = settings.value("enabled").toBool();
+
+		FilterExpression expr(id, op, value);
+		expr.setLabel(label);
+		expr.setEnabled(enabled);
+		m_filterModel->addFilter(expr);
+	}
+	settings.endArray();
+
+	connect(m_filterModel, &FilterModel::filtersChanged, this, &QStuffMainWindow::search);
+	connect(m_widget->addFilterButton, &QToolButton::clicked, [this]{
+		int row = m_filterModel->addFilter(FilterExpression());
+		m_widget->filterList->edit(m_filterModel->index(row));
+	});
+	connect(m_widget->enableAllFiltersButton, &QToolButton::clicked, [this]{
+		m_filterModel->setAllEnabled(true);
+	});
+	connect(m_widget->disableAllFiltersButton, &QToolButton::clicked, [this]{
+		m_filterModel->setAllEnabled(false);
+	});
+	connect(m_widget->removeAllFiltersButton, &QToolButton::clicked, [this]{
+		m_filterModel->removeAllFilters();
+	});
+
+	connect(m_widget->invertFilterButton, &QToolButton::clicked, [this]{
+		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
+		if (! selected.isEmpty())
+		{
+			QSignalBlocker blocker(m_filterModel);
+			for (auto index : selected)
+				m_filterModel->invertFilter(index);
+			search();
+		}
+	});
+	connect(m_widget->removeFilterButton, &QToolButton::clicked, [this]{
+		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
+		if (! selected.isEmpty())
+		{
+			QSignalBlocker blocker(m_filterModel);
+			for (auto index : selected)
+				m_filterModel->removeRow(index.row());
+			search();
+		}
+	});
+
+	connect(m_widget->filterList->selectionModel(), &QItemSelectionModel::selectionChanged, [this]{
+		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
+		bool enable_buttons = ! selected.isEmpty();
+		m_widget->invertFilterButton->setEnabled(enable_buttons);
+		m_widget->removeFilterButton->setEnabled(enable_buttons);
+	});
+}
+
+
+void QStuffMainWindow::setupChartView()
+{
+	m_countsChart = new CountsChart(this);
+	m_widget->countGraph->setChart(m_countsChart->chart());
+	m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
+	m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand)
+;
+	connect(m_countsChart->xAxis(), &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
+		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
+		m_widget->timerangeCombo->setCurrentIndex(index);
+	});
+}
+
+
+void QStuffMainWindow::setupReasonableDockWidgetPositions()
+{
+	addDockWidget(Qt::TopDockWidgetArea, m_widget->chartDock);
+	addDockWidget(Qt::LeftDockWidgetArea, m_widget->filterDock);
+	addDockWidget(Qt::LeftDockWidgetArea, m_widget->keysDock);
+	addDockWidget(Qt::LeftDockWidgetArea, m_widget->logDetailsDock);
+	tabifyDockWidget(m_widget->filterDock, m_widget->logDetailsDock);
+	tabifyDockWidget(m_widget->filterDock, m_widget->keysDock);
 }

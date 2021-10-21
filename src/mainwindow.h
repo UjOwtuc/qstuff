@@ -14,6 +14,7 @@ class LogModel;
 class TimerangeModel;
 class QSortFilterProxyModel;
 class CountsChart;
+class FilterModel;
 
 class QStuffMainWindow : public QMainWindow
 {
@@ -25,10 +26,8 @@ public slots:
 	void search();
 	void currentLogItemChanged(const QItemSelection& selected, const QItemSelection& /* deselected */);
 	void currentTimerangeChanged(int current);
-	void appendSearch(const QString& append);
 	void toggleKeyColumn(int keyIndex);
 	void showKeysContextMenu(const QPoint& point);
-	void hideDetailsView();
 	void loadView(const QString& name);
 	void saveView();
 	void setInputsEnabled(bool enabled);
@@ -38,10 +37,11 @@ protected slots:
 
 protected:
 	void setKeys(const QJsonObject& keys);
-	void closeEvent(QCloseEvent* /*event*/) override;
+	void closeEvent(QCloseEvent* event) override;
 	void saveQueryHistory();
 	void loadQueryHistory();
 	void loadTimerangeChoices();
+	void saveFilters();
 
 private:
 	Ui::QStuffMainWindow* m_widget;
@@ -52,6 +52,12 @@ private:
 	LastInputFocus m_lastInputFocus;
 	QSortFilterProxyModel* m_keysProxy;
 	CountsChart* m_countsChart;
+	FilterModel* m_filterModel;
+
+	void setupKeysView();
+	void setupFilterView();
+	void setupChartView();
+	void setupReasonableDockWidgetPositions();
 };
 
 #endif // MAINQINDOW_H

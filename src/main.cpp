@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QItemEditorFactory>
 
 #include "mainwindow.h"
 
