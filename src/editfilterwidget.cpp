@@ -52,6 +52,7 @@ EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
 		m_widget->opCombo->addItem(it.value(), it.key());
 
 	m_widget->valueCombo->setValidator(new ValueValidator(this));
+	setFocusProxy(m_widget->idCombo);
 }
 
 
