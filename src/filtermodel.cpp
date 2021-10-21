@@ -220,7 +220,7 @@ int FilterModel::addFilter(const FilterExpression& expr)
 		row = findFilter(expr.inverted());
 		if (row >= 0)
 		{
-			m_filters[row] = m_filters[row].inverted();
+			m_filters[row] = expr;
 			auto modelIndex = index(row);
 			dataChanged(modelIndex, modelIndex);
 			changed = row;
