@@ -55,7 +55,6 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 		m_series->append(dt.toMSecsSinceEpoch(), count);
 	}
 
-	qDebug() << "setting x axis time format";
 	qint64 duration = minX.secsTo(maxX);
 	switch (duration)
 	{
