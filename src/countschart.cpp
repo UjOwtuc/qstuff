@@ -21,7 +21,6 @@ CountsChart::CountsChart(QObject* parent)
 
 	m_xAxis = new QDateTimeAxis();
 	m_xAxis->setTickCount(10);
-	m_xAxis->setFormat("HH:mm");
 	m_xAxis->setTitleText("Time");
 	m_chart->addAxis(m_xAxis, Qt::AlignBottom);
 	m_series->attachAxis(m_xAxis);
@@ -54,6 +53,23 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 		minX = std::min(dt, minX);
 		maxX = std::max(dt, maxX);
 		m_series->append(dt.toMSecsSinceEpoch(), count);
+	}
+
+	qDebug() << "setting x axis time format";
+	qint64 duration = minX.secsTo(maxX);
+	switch (duration)
+	{
+		case 0 ... 1800:
+			m_xAxis->setFormat("HH:mm:ss.zzz");
+			break;
+		case 1801 ... 36 * 3600:
+			m_xAxis->setFormat("HH:mm");
+			break;
+		case 36 * 3600 + 1 ... 90 * 24 * 3600:
+			m_xAxis->setFormat("dd.MM HH:mm");
+			break;
+		default:
+			m_xAxis->setFormat("dd.MM.yyyy HH:mm");
 	}
 
 	QSignalBlocker blocker(m_xAxis);
