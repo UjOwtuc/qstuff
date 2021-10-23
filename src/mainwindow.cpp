@@ -125,6 +125,10 @@ QStuffMainWindow::QStuffMainWindow()
 	setupFilterView();
 	setupChartView();
 
+	QAction* toggleLogDetails = m_widget->logDetailsDock->toggleViewAction();
+	toggleLogDetails->setText("Show &Details");
+	m_widget->menu_Window->addAction(toggleLogDetails);
+
 	QSettings settings;
 	restoreGeometry(settings.value("mainwindow/geometry").toByteArray());
 	if (! restoreState(settings.value("mainwindow/windowState").toByteArray()))
@@ -591,6 +595,10 @@ void QStuffMainWindow::setupKeysView()
 
 	connect(m_widget->keysTree, &QTreeView::customContextMenuRequested, this, &QStuffMainWindow::showKeysContextMenu);
 	connect(m_widget->filterKeysEdit, &QLineEdit::textChanged, m_keysProxy, &QSortFilterProxyModel::setFilterWildcard);
+
+	QAction* toggleKeys = m_widget->keysDock->toggleViewAction();
+	toggleKeys->setText("Show &Keys");
+	m_widget->menu_Window->addAction(toggleKeys);
 }
 
 
@@ -652,6 +660,11 @@ void QStuffMainWindow::setupFilterView()
 		m_widget->invertFilterButton->setEnabled(enable_buttons);
 		m_widget->removeFilterButton->setEnabled(enable_buttons);
 	});
+
+	QAction* toggleFilters = m_widget->filterDock->toggleViewAction();
+	toggleFilters->setText("Show &Filters");
+	m_widget->menu_Window->addAction(toggleFilters);
+
 }
 
 
@@ -666,6 +679,10 @@ void QStuffMainWindow::setupChartView()
 		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
 		m_widget->timerangeCombo->setCurrentIndex(index);
 	});
+
+	QAction* toggleChart = m_widget->chartDock->toggleViewAction();
+	toggleChart->setText("Show &Chart");
+	m_widget->menu_Window->addAction(toggleChart);
 }
 
 
