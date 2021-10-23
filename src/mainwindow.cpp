@@ -210,6 +210,7 @@ void QStuffMainWindow::search()
 				query = QString("(%1) and %2").arg(query).arg(input);
 		}
 
+		queryItems.addQueryItem("limit_events", "2000");
 		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("query", query);
@@ -257,7 +258,16 @@ void QStuffMainWindow::requestFinished(QNetworkReply* reply)
 			m_logModel->setLogs(events.toVariantList());
 			m_widget->logsTable->resizeColumnsToContents();
 
-			m_widget->statusbar->showMessage(QString("%1 events in %2").arg(m_logModel->rowCount(QModelIndex())).arg(reply->property("duration string").toString()));
+			QVariantMap metadata = obj["metadata"].toObject().toVariantMap();
+			quint64 eventCount = metadata["event_count"].toULongLong();
+			quint64 displayed = m_logModel->rowCount(QModelIndex());
+
+			m_widget->statusbar->showMessage(
+				QString("filter matched %1 of %2 estimated events in %3")
+					.arg(displayed)
+					.arg(eventCount)
+					.arg(reply->property("duration string").toString())
+			);
 			QVariantMap counts = obj["counts"].toObject().toVariantMap();
 			m_countsChart->plotCounts(counts);
 		}
