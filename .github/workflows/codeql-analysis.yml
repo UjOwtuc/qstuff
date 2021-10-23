@@ -1,0 +1,70 @@
+# vim: set ft=yaml sw=2 ts=2 et :
+
+name: "CodeQL"
+
+"on":
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '45 17 * * 2'
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - cpp
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Cache Qt
+        uses: actions/cache@v1
+        with:
+          path: ../Qt
+          key: ${{ runner.os }}-QtCache
+
+      - name: Install build deps
+        uses: jurplel/install-qt-action@v2
+        with:
+          host: linux
+          target: desktop
+          modules: qtcharts
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+
+      - name: Configure CMake
+        run: >-
+          cmake
+          -B ${{github.workspace}}/build
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      - name: Build
+        run: >-
+          cmake
+          --build ${{github.workspace}}/build
+          --config ${{env.BUILD_TYPE}}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v1
+
