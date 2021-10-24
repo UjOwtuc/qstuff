@@ -163,5 +163,5 @@ QDateTime TimeSpec::toDateTime() const
 		return m_absolute;
 
 	QDateTime now = QDateTime::currentDateTime();
-	return now.addSecs(-1 * m_relativeValue * m_relativeUnit);
+	return now.addSecs(-1 * static_cast<qint64>(m_relativeValue) * m_relativeUnit);
 }
