@@ -9,12 +9,14 @@ namespace QtCharts {
 	class QValueAxis;
 }
 
+
 class CountsChart : public QObject
 {
 public:
 	explicit CountsChart(QObject* parent = nullptr);
 
 	void plotCounts(const QVariantMap& counts);
+	void setInterval(int seconds);
 
 	QtCharts::QChart* chart();
 	QtCharts::QDateTimeAxis* xAxis();

@@ -274,6 +274,7 @@ void QStuffMainWindow::requestFinished(QNetworkReply* reply)
 			);
 			QVariantMap counts = obj["counts"].toObject().toVariantMap();
 			m_countsChart->plotCounts(counts);
+			m_countsChart->setInterval(metadata["counts_interval_sec"].toInt());
 		}
 		else
 			QMessageBox::warning(this, "Malformed Reply", QString("Could not parse server's reply: %1").arg(parseError.errorString()));

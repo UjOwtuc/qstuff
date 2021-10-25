@@ -11,6 +11,7 @@
 
 using namespace QtCharts;
 
+
 CountsChart::CountsChart(QObject* parent)
 	: QObject(parent)
 {
@@ -46,13 +47,18 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 	for (auto it=counts.constBegin(); it!=end; ++it)
 	{
 		QDateTime dt = QDateTime::fromString(it.key(), Qt::ISODate);
-		quint64 count = it.value().toULongLong();
-		minY = std::min(count, minY);
-		maxY = std::max(count, maxY);
+		if (dt.isValid())
+		{
+			quint64 count = it.value().toULongLong();
+			minY = std::min(count, minY);
+			maxY = std::max(count, maxY);
 
-		minX = std::min(dt, minX);
-		maxX = std::max(dt, maxX);
-		m_series->append(dt.toMSecsSinceEpoch(), count);
+			minX = std::min(dt, minX);
+			maxX = std::max(dt, maxX);
+			m_series->append(dt.toMSecsSinceEpoch(), count);
+		}
+		else
+			qDebug() << "invalid date in counts:" << it.key();
 	}
 
 	qint64 duration = minX.secsTo(maxX);
@@ -74,6 +80,37 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 	QSignalBlocker blocker(m_xAxis);
 	m_xAxis->setRange(minX, maxX);
 	m_yAxis->setRange(minY, maxY);
+}
+
+
+void CountsChart::setInterval(int seconds)
+{
+	QString label;
+	switch (seconds)
+	{
+		case 1:
+			label = "second";
+			break;
+		case 2 ... 59:
+			label = QString("%1 seconds").arg(seconds);
+			break;
+		case 60:
+			label = "minute";
+			break;
+		case 61 ... 3599:
+			label = QString("%1:%2 minutes").arg(int(seconds / 60)).arg(seconds % 60);
+			break;
+		case 3600:
+			label = "hour";
+			break;
+		case 3601 ... 24 * 3600 -1:
+			label = QTime::fromMSecsSinceStartOfDay(1000 * seconds).toString("HH:mm:ss");
+			break;
+		case 24 * 3600:
+			label = "day";
+			break;
+	}
+	m_yAxis->setTitleText(QString("Events per %1").arg(label));
 }
 
 
