@@ -27,7 +27,10 @@ QVariant LogModel::data(const QModelIndex& index, int role) const
 	if (index.isValid() && index.row() < m_data.size() && role == Qt::DisplayRole)
 	{
 		auto event = m_data[index.row()].toMap();
-		return event["source"].toMap().value(m_columns[index.column()]);
+		QVariant data = event["source"].toMap().value(m_columns[index.column()]);
+		if (data.canConvert<QStringList>())
+			data = data.toStringList().join(", ");
+		return data;
 	}
 	return QVariant();
 }

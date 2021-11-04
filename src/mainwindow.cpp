@@ -433,7 +433,12 @@ void QStuffMainWindow::currentLogItemChanged(const QItemSelection& selected, con
 		for (auto it=event.constBegin(); it!=end; ++it, ++row)
 		{
 			m_widget->detailsTable->setItem(row, 0, new QTableWidgetItem(it.key()));
-			m_widget->detailsTable->setItem(row, 1, new QTableWidgetItem(it.value().toString()));
+			QString value;
+			if (it.value().canConvert<QStringList>())
+				value = it.value().toStringList().join(", ");
+			else
+				value = it.value().toString();
+			m_widget->detailsTable->setItem(row, 1, new QTableWidgetItem(value));
 		}
 		m_widget->detailsTable->resizeColumnsToContents();
 		m_widget->detailsTable->resizeRowsToContents();
