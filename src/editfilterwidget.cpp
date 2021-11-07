@@ -1,41 +1,35 @@
 #include "editfilterwidget.h"
 #include "filtermodel.h"
+#include "queryvalidator.h"
 
 #include <QCompleter>
 #include <QStringListModel>
 #include <QDebug>
+#include <QColor>
 
 #include "ui_editfilterwidget.h"
 
 
-class ValueValidator : public QValidator
+SyntaxCheckedLineedit::SyntaxCheckedLineedit(QWidget* parent)
+	: QLineEdit(parent)
 {
-public:
-	explicit ValueValidator(QObject* parent = nullptr) : QValidator(parent) {}
+	m_colorRole = QPalette::Text;
+	m_okColor = Qt::black;
+	m_problemColor = Qt::red;
+	connect(this, &QLineEdit::textChanged, this, &SyntaxCheckedLineedit::checkContent);
+}
 
-	void fixup(QString& input) const override
+
+void SyntaxCheckedLineedit::checkContent()
+{
+	auto pal = palette();
+	bool ok = hasAcceptableInput();
+	if ((ok && pal.color(m_colorRole) != m_okColor) || (!ok && pal.color(m_colorRole) != m_problemColor))
 	{
-		bool ok;
-		input.toDouble(&ok);
-		if (! ok && input.length() > 0 && input.front() != '"')
-			input.prepend('"');
-		if (! ok && input.length() > 0 && input.back() != '"')
-			input.append('"');
+		pal.setColor(m_colorRole, ok ? m_okColor : m_problemColor);
+		setPalette(pal);
 	}
-
-	QValidator::State validate(QString& input, int& /*pos*/) const override
-	{
-		bool ok;
-		input.toDouble(&ok);
-		if (ok)
-			return Acceptable;
-
-		if (input.length() >= 2 && input.front() == '"' && input.back() == '"')
-			return Acceptable;
-
-		return Intermediate;
-	}
-};
+}
 
 
 EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
@@ -44,6 +38,7 @@ EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
 	m_widget = new Ui::EditFilterWidget;
 	m_widget->setupUi(this);
 
+	m_validator = new QueryValidator(QueryValidator::Scalar, this);
 	m_valueCompletions = nullptr;
 
 	const QMap<FilterExpression::Op, QString>& ops = FilterExpression::ops();
@@ -51,7 +46,36 @@ EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
 	for (auto it=ops.constBegin(); it != end; ++it)
 		m_widget->opCombo->addItem(it.value(), it.key());
 
-	m_widget->valueCombo->setValidator(new ValueValidator(this));
+	m_widget->idCombo->setLineEdit(new SyntaxCheckedLineedit(this));
+	m_widget->idCombo->setValidator(new QueryValidator(QueryValidator::Field, this));
+	m_widget->valueCombo->setLineEdit(new SyntaxCheckedLineedit(this));
+	m_widget->valueCombo->setValidator(m_validator);
+	connect(m_widget->opCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index){
+		if (index < 0)
+			m_widget->opCombo->setCurrentIndex(0);
+		else
+		{
+			auto op = static_cast<FilterExpression::Op>(index);
+			switch (op)
+			{
+				case FilterExpression::Eq:
+				case FilterExpression::Neq:
+				case FilterExpression::Ge:
+				case FilterExpression::Gt:
+				case FilterExpression::Le:
+				case FilterExpression::Lt:
+				case FilterExpression::Like:
+				case FilterExpression::NotLike:
+					m_validator->setRule(QueryValidator::Scalar);
+					break;
+				case FilterExpression::In:
+				case FilterExpression::NotIn:
+					m_validator->setRule(QueryValidator::List);
+					break;
+			}
+			qobject_cast<SyntaxCheckedLineedit*>(m_widget->valueCombo->lineEdit())->checkContent();
+		}
+	});
 	setFocusProxy(m_widget->idCombo);
 }
 

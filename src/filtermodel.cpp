@@ -1,5 +1,7 @@
 #include "filtermodel.h"
+#include "queryvalidator.h"
 
+#include <QBrush>
 #include <QDebug>
 
 namespace {
@@ -178,6 +180,11 @@ QVariant FilterModel::data(const QModelIndex& index, int role) const
 			case Qt::CheckStateRole:
 				data.setValue(filter.enabled() ? Qt::Checked : Qt::Unchecked);
 				break;
+			case Qt::ForegroundRole:
+				if (check_parseable(QueryValidator::Query, filter.toString().toUtf8().constData()) == -1)
+					data.setValue(QBrush(Qt::black));
+				else
+					data.setValue(QBrush(Qt::red));
 		}
 	}
 	return data;

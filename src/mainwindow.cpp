@@ -8,6 +8,8 @@
 #include "countschart.h"
 #include "filtermodel.h"
 #include "filterdelegate.h"
+#include "queryvalidator.h"
+#include "editfilterwidget.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -141,6 +143,8 @@ QStuffMainWindow::QStuffMainWindow()
 	m_timerangeModel = new TimerangeModel(this);
 	m_widget->timerangeCombo->setModel(m_timerangeModel);
 
+	m_widget->queryInputCombo->setLineEdit(new SyntaxCheckedLineedit(this));
+	m_widget->queryInputCombo->setValidator(new QueryValidator(QueryValidator::Query, this));
 	QIcon clearIcon = QIcon::fromTheme("edit-clear", QIcon(QPixmap(clearLineXpm)));
 	QAction* clearQuery = m_widget->queryInputCombo->lineEdit()->addAction(clearIcon, QLineEdit::TrailingPosition);;
 	connect(clearQuery, &QAction::triggered, [this]{
