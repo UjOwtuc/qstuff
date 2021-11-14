@@ -1,5 +1,4 @@
 set(qstuff_SRCS
-	main.cpp
 	mainwindow.cpp
 	percentbardelegate.cpp
 	logmodel.cpp
@@ -22,7 +21,19 @@ if(EXISTS ${logstuff_query})
 	set(qstuff_LIBS ${qstuff_LIBS} ${logstuff_query})
 endif()
 
+add_library(libqstuff ${qstuff_SRCS})
+target_link_libraries(libqstuff ${qstuff_LIBS})
 
-add_executable(qstuff ${qstuff_SRCS})
-target_link_libraries(qstuff ${qstuff_LIBS})
+add_executable(qstuff main.cpp)
+target_link_libraries(qstuff ${qstuff_LIBS} libqstuff)
 install(TARGETS qstuff ${INSTALL_TARGETS_DEFAULT_ARGS})
+
+set(qstuff_TESTS
+	test_queryvalidator.cpp
+)
+if(EXISTS ${Qt5Test_DIR})
+	enable_testing()
+	add_executable(qstuff_tests ${qstuff_TESTS})
+	target_link_libraries(qstuff_tests Qt5::Test ${qstuff_LIBS} libqstuff)
+	add_test(NAME qstuff_tests COMMAND qstuff_tests)
+endif()
