@@ -6,6 +6,7 @@ name: Debian Package
   push:
     branches:
       - main
+      - test-old-qt
 
 jobs:
   build:

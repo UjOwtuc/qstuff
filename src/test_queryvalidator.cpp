@@ -1,6 +1,8 @@
 #include "test_queryvalidator.h"
 #include "queryvalidator.h"
 
+Q_DECLARE_METATYPE(QValidator::State);
+
 
 void TestQueryValidator::fields_data()
 {
