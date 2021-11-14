@@ -442,7 +442,9 @@ void QStuffMainWindow::currentLogItemChanged(const QItemSelection& selected, con
 				value = it.value().toStringList().join(", ");
 			else
 				value = it.value().toString();
-			m_widget->detailsTable->setItem(row, 1, new QTableWidgetItem(value));
+			auto valueItem = new QTableWidgetItem(value);
+			valueItem->setFlags(valueItem->flags() | Qt::ItemIsEditable);
+			m_widget->detailsTable->setItem(row, 1, valueItem);
 		}
 		m_widget->detailsTable->resizeColumnsToContents();
 		m_widget->detailsTable->resizeRowsToContents();
