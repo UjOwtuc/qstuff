@@ -111,6 +111,9 @@ void EditFilterWidget::setExpression(const FilterExpression& expression)
 	m_widget->opCombo->setCurrentIndex(m_widget->opCombo->findData(static_cast<int>(expression.op())));
 	m_widget->valueCombo->setCurrentText(expression.value());
 	m_widget->enabledCheckBox->setChecked(expression.enabled());
+
+	if (expression.hasCustomLabel())
+		setLabel(expression.label());
 }
 
 

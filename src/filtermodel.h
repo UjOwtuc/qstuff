@@ -31,6 +31,7 @@ public:
 	Op op() const { return m_op; }
 	const QString& value() const { return m_value; }
 	QString label() const;
+	bool hasCustomLabel() const { return !m_label.isEmpty(); }
 
 	bool isEmpty() const;
 
