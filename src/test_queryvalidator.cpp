@@ -1,7 +1,9 @@
 #include "test_queryvalidator.h"
 #include "queryvalidator.h"
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 15, 0))
 Q_DECLARE_METATYPE(QValidator::State);
+#endif
 
 
 void TestQueryValidator::fields_data()
