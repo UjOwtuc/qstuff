@@ -10,6 +10,7 @@
 #include "filterdelegate.h"
 #include "queryvalidator.h"
 #include "editfilterwidget.h"
+#include "settingsdialog.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -136,6 +137,8 @@ QStuffMainWindow::QStuffMainWindow()
 	if (! restoreState(settings.value("mainwindow/windowState").toByteArray()))
 		setupReasonableDockWidgetPositions();
 
+	m_searchUrl = settings.value("stuffstream_url", "http://localhost:8080/events").toString();
+	m_searchMaxEvents = settings.value("max_events", 2000).toULongLong();
 
 	m_logModel = new LogModel(settings.value("default_columns", QStringList({"hostname", "programname", "msg"})).toStringList());
 	m_widget->logsTable->setModel(m_logModel);
@@ -183,6 +186,7 @@ QStuffMainWindow::QStuffMainWindow()
 	loadTimerangeChoices();
 	loadQueryHistory();
 
+	connect(m_widget->action_Settings, &QAction::triggered, this, &QStuffMainWindow::showSettingsDialog);
 	QTimer::singleShot(0, this, &QStuffMainWindow::search);
 }
 
@@ -218,11 +222,11 @@ void QStuffMainWindow::search()
 				query = QString("(%1) and %2").arg(query).arg(input);
 		}
 
-		queryItems.addQueryItem("limit_events", "2000");
+		queryItems.addQueryItem("limit_events", QString::number(m_searchMaxEvents));
 		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
 		queryItems.addQueryItem("query", query);
-		QUrl url("http://localhost:8080/events");
+		QUrl url(m_searchUrl);
 		url.setQuery(queryItems);
 		QNetworkRequest req(url);
 		auto reply = m_netAccess->get(req);
@@ -591,6 +595,24 @@ void QStuffMainWindow::setInputsEnabled(bool enabled)
 {
 	m_widget->queryInputCombo->setEnabled(enabled);
 	m_widget->timerangeCombo->setEnabled(enabled);
+}
+
+
+void QStuffMainWindow::showSettingsDialog()
+{
+	SettingsDialog dlg(this);
+	dlg.setStuffstreamUrl(m_searchUrl);
+	dlg.setMaxEvents(m_searchMaxEvents);
+
+	if (dlg.exec() == QDialog::Accepted)
+	{
+		m_searchUrl = dlg.stuffstreamUrl();
+		m_searchMaxEvents = dlg.maxEvents();
+		QSettings settings;
+		settings.setValue("stuffstream_url", m_searchUrl);
+		settings.setValue("max_events", m_searchMaxEvents);
+		search();
+	}
 }
 
 

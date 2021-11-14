@@ -130,6 +130,14 @@
      <string>&amp;Window</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menu_File">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="action_Settings"/>
+    <addaction name="action_Quit"/>
+   </widget>
+   <addaction name="menu_File"/>
    <addaction name="menu_view"/>
    <addaction name="menu_Window"/>
   </widget>
@@ -417,6 +425,19 @@
     <string>&amp;Reset Columns</string>
    </property>
   </action>
+  <action name="action_Quit">
+   <property name="text">
+    <string>&amp;Quit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="action_Settings">
+   <property name="text">
+    <string>&amp;Settings ...</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -426,5 +447,22 @@
   </customwidget>
  </customwidgets>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>action_Quit</sender>
+   <signal>triggered()</signal>
+   <receiver>QStuffMainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>573</x>
+     <y>403</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

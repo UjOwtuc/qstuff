@@ -31,6 +31,7 @@ public slots:
 	void loadView(const QString& name);
 	void saveView();
 	void setInputsEnabled(bool enabled);
+	void showSettingsDialog();
 
 protected slots:
 	void requestFinished(QNetworkReply* reply);
@@ -53,6 +54,9 @@ private:
 	QSortFilterProxyModel* m_keysProxy;
 	CountsChart* m_countsChart;
 	FilterModel* m_filterModel;
+
+	QString m_searchUrl;
+	quint64 m_searchMaxEvents;
 
 	void setupKeysView();
 	void setupFilterView();
