@@ -284,6 +284,9 @@
        <property name="placeholderText">
         <string>Filter Keys</string>
        </property>
+       <property name="clearButtonEnabled">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>

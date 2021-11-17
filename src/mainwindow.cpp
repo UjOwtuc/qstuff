@@ -30,17 +30,6 @@
 #include "ui_mainwindow.h"
 
 
-static const char *clearLineXpm[]={
-"15 5 2 1",
-"# c #000000",
-". c #ffffff",
-".....###..#...#",
-"..####.....#.#.",
-"###.........#..",
-"..####.....#.#.",
-".....###..#...#"};
-
-
 QString formatDuration(const QDateTime& start, const QDateTime& end)
 {
 	QStringList result;
@@ -123,6 +112,7 @@ QStuffMainWindow::QStuffMainWindow()
 	m_widget = new Ui::QStuffMainWindow();
 	m_widget->setupUi(this);
 	m_netAccess = new QNetworkAccessManager(this);
+	m_sslConfiguration = nullptr;
 
 	setupKeysView();
 	setupFilterView();
@@ -139,6 +129,7 @@ QStuffMainWindow::QStuffMainWindow()
 
 	m_searchUrl = settings.value("stuffstream_url", "http://localhost:8080/events").toString();
 	m_searchMaxEvents = settings.value("max_events", 2000).toULongLong();
+	setCaCertificate(settings.value("ca_certificate", "").toString());
 
 	m_logModel = new LogModel(settings.value("default_columns", QStringList({"hostname", "programname", "msg"})).toStringList());
 	m_widget->logsTable->setModel(m_logModel);
@@ -148,15 +139,13 @@ QStuffMainWindow::QStuffMainWindow()
 
 	m_widget->queryInputCombo->setLineEdit(new SyntaxCheckedLineedit(this));
 	m_widget->queryInputCombo->setValidator(new QueryValidator(QueryValidator::Query, this));
-	QIcon clearIcon = QIcon::fromTheme("edit-clear", QIcon(QPixmap(clearLineXpm)));
-	QAction* clearQuery = m_widget->queryInputCombo->lineEdit()->addAction(clearIcon, QLineEdit::TrailingPosition);;
-	connect(clearQuery, &QAction::triggered, [this]{
-		m_widget->queryInputCombo->lineEdit()->clear();
-		search();
-	});
+	m_widget->queryInputCombo->lineEdit()->setClearButtonEnabled(true);
 
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
 	connect(m_netAccess, &QNetworkAccessManager::finished, this, &QStuffMainWindow::requestFinished);
+	connect(m_netAccess, &QNetworkAccessManager::sslErrors, [this](QNetworkReply* reply, const QList<QSslError>& errors){
+		qDebug() << "ssl errors:" << errors;
+	});
 	connect(m_widget->timerangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::currentTimerangeChanged);
 
 	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
@@ -229,6 +218,8 @@ void QStuffMainWindow::search()
 		QUrl url(m_searchUrl);
 		url.setQuery(queryItems);
 		QNetworkRequest req(url);
+		if (m_sslConfiguration)
+			req.setSslConfiguration(*m_sslConfiguration);
 		auto reply = m_netAccess->get(req);
 
 		QLabel* taskLabel = new QLabel("Waiting for response headers", m_widget->statusbar);
@@ -601,17 +592,34 @@ void QStuffMainWindow::setInputsEnabled(bool enabled)
 void QStuffMainWindow::showSettingsDialog()
 {
 	SettingsDialog dlg(this);
+	QSettings settings;
 	dlg.setStuffstreamUrl(m_searchUrl);
 	dlg.setMaxEvents(m_searchMaxEvents);
+	dlg.setTrustedCerts(settings.value("ca_certificate", "").toString());
 
 	if (dlg.exec() == QDialog::Accepted)
 	{
 		m_searchUrl = dlg.stuffstreamUrl();
 		m_searchMaxEvents = dlg.maxEvents();
-		QSettings settings;
+		setCaCertificate(dlg.trustedCerts());
 		settings.setValue("stuffstream_url", m_searchUrl);
 		settings.setValue("max_events", m_searchMaxEvents);
+		settings.setValue("ca_certificate", dlg.trustedCerts());
 		search();
+	}
+}
+
+
+void QStuffMainWindow::setCaCertificate(const QString& filename)
+{
+	delete m_sslConfiguration;
+	m_sslConfiguration = nullptr;
+	if (! filename.isEmpty())
+	{
+		m_sslConfiguration = new QSslConfiguration(QSslConfiguration::defaultConfiguration());
+		QFile f(filename);
+		f.open(QIODevice::ReadOnly);
+		m_sslConfiguration->addCaCertificates(QSslCertificate::fromData(f.readAll()));
 	}
 }
 

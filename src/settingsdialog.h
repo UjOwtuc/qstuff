@@ -11,6 +11,7 @@ class SettingsDialog : public QDialog
 {
 	Q_PROPERTY(QString stuffstream_url READ stuffstreamUrl WRITE setStuffstreamUrl USER true);
 	Q_PROPERTY(quint64 max_events READ maxEvents WRITE setMaxEvents USER true);
+	Q_PROPERTY(QString trusted_certs READ trustedCerts WRITE setTrustedCerts USER true);
 
 public:
 	explicit SettingsDialog(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
@@ -20,6 +21,9 @@ public:
 
 	quint16 maxEvents() const;
 	void setMaxEvents(quint64 value);
+
+	QString trustedCerts() const;
+	void setTrustedCerts(const QString& value);
 
 private:
 	Ui::SettingsDialog* m_widget;

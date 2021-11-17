@@ -15,6 +15,7 @@ class TimerangeModel;
 class QSortFilterProxyModel;
 class CountsChart;
 class FilterModel;
+class QSslConfiguration;
 
 class QStuffMainWindow : public QMainWindow
 {
@@ -32,6 +33,7 @@ public slots:
 	void saveView();
 	void setInputsEnabled(bool enabled);
 	void showSettingsDialog();
+	void setCaCertificate(const QString& filename);
 
 protected slots:
 	void requestFinished(QNetworkReply* reply);
@@ -57,6 +59,7 @@ private:
 
 	QString m_searchUrl;
 	quint64 m_searchMaxEvents;
+	QSslConfiguration *m_sslConfiguration;
 
 	void setupKeysView();
 	void setupFilterView();
