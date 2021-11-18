@@ -4,6 +4,7 @@
 #include <QFileSystemModel>
 #include <QDebug>
 #include <QTimer>
+#include <QFileDialog>
 
 #include "ui_settingsdialog.h"
 
@@ -50,6 +51,17 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 			}
 			QMetaObject::invokeMethod(completer, "complete", Qt::QueuedConnection);
 		}
+	});
+
+	connect(m_widget->trustedCertsBrowseButton, &QToolButton::clicked, [this]{
+		QString filename = QFileDialog::getOpenFileName(
+			this,
+			"Trusted Certificate Bundle",
+			m_widget->trustedCertsEdit->text(),
+			"PEM Certificates (*.crt *.pem *.cert)"
+		);
+		if (! filename.isEmpty())
+			m_widget->trustedCertsEdit->setText(filename);
 	});
 }
 

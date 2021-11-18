@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>459</width>
-    <height>166</height>
+    <width>494</width>
+    <height>188</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,6 +27,34 @@
       <bool>true</bool>
      </property>
     </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="trustedCertsLabel">
+     <property name="text">
+      <string>Trusted Certificates:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QLineEdit" name="trustedCertsEdit">
+       <property name="clearButtonEnabled">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="trustedCertsBrowseButton">
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-open"/>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item row="2" column="0">
     <widget class="QLabel" name="maxEventsLabel">
@@ -71,25 +99,12 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="trustedCertsLabel">
-     <property name="text">
-      <string>Trusted CA Certificates:</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1">
-    <widget class="QLineEdit" name="trustedCertsEdit">
-     <property name="clearButtonEnabled">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
   </layout>
  </widget>
  <tabstops>
   <tabstop>stuffstreamUrlEdit</tabstop>
   <tabstop>trustedCertsEdit</tabstop>
+  <tabstop>trustedCertsBrowseButton</tabstop>
   <tabstop>maxEventsSpinbox</tabstop>
  </tabstops>
  <resources/>
