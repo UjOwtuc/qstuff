@@ -65,12 +65,12 @@ void TestQueryValidator::list_data()
 	QTest::addColumn<QString>("input");
 	QTest::addColumn<QValidator::State>("result");
 
-	QTest::newRow("empty") << "()" << QueryValidator::Intermediate;
+	QTest::newRow("empty") << "()" << QueryValidator::Acceptable;
 	QTest::newRow("integer") << "(1, 2, 3)" << QueryValidator::Acceptable;
 	QTest::newRow("floats") << "(1.1, 2.2, 3.3)" << QueryValidator::Acceptable;
 	QTest::newRow("mixed interger and floats") << "(1.1, 2, 3.3)" << QueryValidator::Acceptable;
 	QTest::newRow("strings") << "(\"a\", \"b\", \"c\")" << QueryValidator::Acceptable;
-	QTest::newRow("mixed numbers and strings") << "(\"a\", 5, \"c\")" << QueryValidator::Intermediate;
+	QTest::newRow("mixed numbers and strings") << "(\"a\", 5, \"c\")" << QueryValidator::Acceptable;
 }
 
 

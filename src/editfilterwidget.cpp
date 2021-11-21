@@ -59,17 +59,14 @@ EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
 			switch (op)
 			{
 				case FilterExpression::Eq:
-				case FilterExpression::Neq:
 				case FilterExpression::Ge:
 				case FilterExpression::Gt:
 				case FilterExpression::Le:
 				case FilterExpression::Lt:
 				case FilterExpression::Like:
-				case FilterExpression::NotLike:
 					m_validator->setRule(QueryValidator::Scalar);
 					break;
 				case FilterExpression::In:
-				case FilterExpression::NotIn:
 					m_validator->setRule(QueryValidator::List);
 					break;
 			}
@@ -98,7 +95,8 @@ FilterExpression EditFilterWidget::expression() const
 	FilterExpression expr(
 		m_widget->idCombo->currentText(),
 		static_cast<FilterExpression::Op>(m_widget->opCombo->itemData(m_widget->opCombo->currentIndex(), Qt::UserRole).toInt()),
-		m_widget->valueCombo->currentText()
+		m_widget->valueCombo->currentText(),
+		m_widget->invertFilterCheckbox->isChecked()
 	);
 	expr.setEnabled(m_widget->enabledCheckBox->isChecked());
 	return expr;
@@ -110,6 +108,7 @@ void EditFilterWidget::setExpression(const FilterExpression& expression)
 	m_widget->idCombo->setCurrentText(expression.id());
 	m_widget->opCombo->setCurrentIndex(m_widget->opCombo->findData(static_cast<int>(expression.op())));
 	m_widget->valueCombo->setCurrentText(expression.value());
+	m_widget->invertFilterCheckbox->setChecked(expression.isInverted());
 	m_widget->enabledCheckBox->setChecked(expression.enabled());
 
 	if (expression.hasCustomLabel())

@@ -7,13 +7,13 @@
     <x>0</x>
     <y>0</y>
     <width>300</width>
-    <height>120</height>
+    <height>150</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>300</width>
-    <height>120</height>
+    <height>150</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -54,6 +54,13 @@
     </layout>
    </item>
    <item>
+    <widget class="QCheckBox" name="invertFilterCheckbox">
+     <property name="text">
+      <string>Invert Match</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <layout class="QGridLayout" name="gridLayout">
      <item row="0" column="0">
       <widget class="QLabel" name="customLabelLabel">
@@ -89,6 +96,14 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>idCombo</tabstop>
+  <tabstop>opCombo</tabstop>
+  <tabstop>valueCombo</tabstop>
+  <tabstop>invertFilterCheckbox</tabstop>
+  <tabstop>customLabelEdit</tabstop>
+  <tabstop>enabledCheckBox</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

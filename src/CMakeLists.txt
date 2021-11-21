@@ -33,7 +33,6 @@ set(qstuff_TESTS
 	test_queryvalidator.cpp
 )
 if(EXISTS ${Qt5Test_DIR})
-	enable_testing()
 	add_executable(qstuff_tests ${qstuff_TESTS})
 	target_link_libraries(qstuff_tests Qt5::Test ${qstuff_LIBS} libqstuff)
 	add_test(NAME qstuff_tests COMMAND qstuff_tests)

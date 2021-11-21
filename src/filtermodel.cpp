@@ -10,15 +10,12 @@ namespace {
 	void fillGlobalMaps()
 	{
 		opStrings.insert(FilterExpression::Eq, "=");
-		opStrings.insert(FilterExpression::Neq, "!=");
 		opStrings.insert(FilterExpression::Lt, "<");
 		opStrings.insert(FilterExpression::Le, "<=");
 		opStrings.insert(FilterExpression::Gt, ">");
 		opStrings.insert(FilterExpression::Ge, ">=");
 		opStrings.insert(FilterExpression::In, "in");
-		opStrings.insert(FilterExpression::NotIn, "not in");
 		opStrings.insert(FilterExpression::Like, "like");
-		opStrings.insert(FilterExpression::NotLike, "not like");
 	}
 }
 
@@ -39,28 +36,12 @@ QString FilterExpression::opString(FilterExpression::Op op)
 }
 
 
-FilterExpression::Op FilterExpression::invertOp(FilterExpression::Op op)
-{
-	switch (op)
-	{
-		case Eq: return Neq;
-		case Neq: return Eq;
-		case Lt: return Ge;
-		case Le: return Gt;
-		case Gt: return Le;
-		case Ge: return Lt;
-		case In: return NotIn;
-		case NotIn: return In;
-		case Like: return NotLike;
-		case NotLike: return Like;
-	}
-	qFatal("unhandled op");
-}
-
-
 FilterExpression::FilterExpression()
 {
+	m_op = Eq;
 	m_enabled = true;
+	m_inverted = false;
+	m_isValid = false;
 }
 
 
@@ -70,9 +51,11 @@ FilterExpression::FilterExpression(const FilterExpression& other)
 }
 
 
-FilterExpression::FilterExpression(const QString& id, FilterExpression::Op op, const QString& value)
-	: m_id(id), m_op(op), m_value(value), m_enabled(true)
-{}
+FilterExpression::FilterExpression(const QString& id, FilterExpression::Op op, const QString& value, bool inverted)
+	: m_id(id), m_op(op), m_value(value), m_enabled(true), m_inverted(inverted)
+{
+	m_isValid = check_parseable(QueryValidator::Query, toString()) == -1;
+}
 
 
 FilterExpression& FilterExpression::operator=(const FilterExpression& rhs)
@@ -82,6 +65,8 @@ FilterExpression& FilterExpression::operator=(const FilterExpression& rhs)
 	m_value = rhs.m_value;
 	m_enabled = rhs.m_enabled;
 	m_label = rhs.m_label;
+	m_inverted = rhs.m_inverted;
+	m_isValid = rhs.m_isValid;
 	return *this;
 }
 
@@ -106,35 +91,22 @@ bool FilterExpression::operator!=(const FilterExpression& rhs) const
 
 QString FilterExpression::toString() const
 {
-	return QString("%1 %2 %3").arg(m_id).arg(opString(m_op)).arg(m_value);
+	return QString("%1%2 %3 %4").arg(m_inverted ? "not " : "").arg(m_id).arg(opString(m_op)).arg(m_value);
 }
 
 FilterExpression FilterExpression::inverted() const
 {
 	FilterExpression inv(*this);
-	inv.m_op = invertOp(m_op);
-	if (! m_label.isEmpty())
-		inv.m_label = QString("NOT %1").arg(m_label);
+	inv.m_inverted = !m_inverted;
 
+	if (inv.hasCustomLabel())
+	{
+		if (inv.m_label.startsWith("not "))
+			inv.m_label = inv.m_label.mid(4);
+		else
+			inv.m_label = "not " + inv.m_label;
+	}
 	return inv;
-}
-
-
-bool FilterExpression::enabled() const
-{
-	return m_enabled;
-}
-
-
-void FilterExpression::setEnabled(bool enabled)
-{
-	m_enabled = enabled;
-}
-
-
-void FilterExpression::setLabel(const QString& label)
-{
-	m_label = label;
 }
 
 
@@ -181,7 +153,7 @@ QVariant FilterModel::data(const QModelIndex& index, int role) const
 				data.setValue(filter.enabled() ? Qt::Checked : Qt::Unchecked);
 				break;
 			case Qt::ForegroundRole:
-				if (check_parseable(QueryValidator::Query, filter.toString().toUtf8().constData()) == -1)
+				if (filter.isValid())
 					data.setValue(QBrush(Qt::black));
 				else
 					data.setValue(QBrush(Qt::red));
@@ -216,7 +188,7 @@ int FilterModel::addFilter(const FilterExpression& expr)
 	if (row >= 0)
 	{
 		changed = row;
-		if( m_filters[row].enabled() != expr.enabled())
+		if (m_filters[row].enabled() != expr.enabled())
 		{
 			m_filters[row].setEnabled(expr.enabled());
 			dataChanged(index(row), index(row));
@@ -224,22 +196,12 @@ int FilterModel::addFilter(const FilterExpression& expr)
 	}
 	else
 	{
-		row = findFilter(expr.inverted());
-		if (row >= 0)
-		{
-			m_filters[row] = expr;
-			auto modelIndex = index(row);
-			dataChanged(modelIndex, modelIndex);
-			changed = row;
-		}
-		else
-		{
-			changed = m_filters.size();
-			beginInsertRows(QModelIndex(), m_filters.size(), m_filters.size());
-			m_filters << expr;
-			endInsertRows();
-		}
+		changed = m_filters.size();
+		beginInsertRows(QModelIndex(), m_filters.size(), m_filters.size());
+		m_filters << expr;
+		endInsertRows();
 	}
+
 	return changed;
 }
 

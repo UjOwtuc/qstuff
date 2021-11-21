@@ -73,10 +73,11 @@ void saveFiltersArray(QSettings& settings, const QList<FilterExpression>& filter
 		settings.setValue("id", filter.id());
 		settings.setValue("op", filter.op());
 		settings.setValue("value", filter.value());
-		if (filter.label() != filter.toString())
+		if (filter.hasCustomLabel())
 			settings.setValue("label", filter.label());
 		else
 			settings.setValue("label", QString());
+		settings.setValue("inverted", filter.isInverted());
 		settings.setValue("enabled", filter.enabled());
 	}
 	settings.endArray();
@@ -94,9 +95,10 @@ QList<FilterExpression> loadFiltersArray(QSettings& settings)
 		FilterExpression::Op op = static_cast<FilterExpression::Op>(settings.value("op").toInt());
 		QString value = settings.value("value").toString();
 		QString label = settings.value("label").toString();
+		bool inverted = settings.value("inverted").toBool();
 		bool enabled = settings.value("enabled").toBool();
 
-		FilterExpression expr(id, op, value);
+		FilterExpression expr(id, op, value, inverted);
 		expr.setLabel(label);
 		expr.setEnabled(enabled);
 		filters << expr;
@@ -498,14 +500,14 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 			value = QString("\"%1\"").arg(value);
 			QAction* filter = new QAction("Filter for value", contextMenu);
 			connect(filter, &QAction::triggered, [this, key, value]{
-				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value)) >= 0)
+				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value, false)) >= 0)
 					search();
 			});
 			contextMenu->addAction(filter);
 
 			QAction* filterNot = new QAction("Filter out value", contextMenu);
 			connect(filterNot, &QAction::triggered, [this, key, value]{
-				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Neq, value)) >= 0)
+				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value, true)) >= 0)
 					search();
 			});
 			contextMenu->addAction(filterNot);

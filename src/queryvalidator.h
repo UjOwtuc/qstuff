@@ -25,8 +25,6 @@ private:
 	ParseRule m_rule;
 };
 
-extern "C" {
-qint32 check_parseable(QueryValidator::ParseRule input_type, const char* query_string);
-}
+qint32 check_parseable(QueryValidator::ParseRule rule, const QString& value);
 
 #endif // QUERYVALIDATOR_H
