@@ -16,6 +16,8 @@ CountsChart::CountsChart(QObject* parent)
 	: QObject(parent)
 {
 	m_series = new QLineSeries();
+	m_series->setPointsVisible(true);
+
 	m_chart = new QChart();
 	m_chart->addSeries(m_series);
 	m_chart->legend()->hide();
@@ -39,8 +41,8 @@ CountsChart::CountsChart(QObject* parent)
 void CountsChart::plotCounts(const QVariantMap& counts)
 {
 	m_series->clear();
-	QDateTime minX, maxX;
-	minX = QDateTime::currentDateTime().addYears(10000000);  // couldn't find a sane maximum value for QDateTime
+	const QDateTime minX = QDateTime::fromString(counts.firstKey(), Qt::ISODate);
+	const QDateTime maxX = QDateTime::fromString(counts.lastKey(), Qt::ISODate);;
 	quint64 minY=std::numeric_limits<quint64>::max(), maxY=0;
 
 	auto end = counts.constEnd();
@@ -52,9 +54,6 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 			quint64 count = it.value().toULongLong();
 			minY = std::min(count, minY);
 			maxY = std::max(count, maxY);
-
-			minX = std::min(dt, minX);
-			maxX = std::max(dt, maxX);
 			m_series->append(dt.toMSecsSinceEpoch(), count);
 		}
 		else
@@ -65,7 +64,7 @@ void CountsChart::plotCounts(const QVariantMap& counts)
 	switch (duration)
 	{
 		case 0 ... 1800:
-			m_xAxis->setFormat("HH:mm:ss.zzz");
+			m_xAxis->setFormat("HH:mm:ss");
 			break;
 		case 1801 ... 36 * 3600:
 			m_xAxis->setFormat("HH:mm");
