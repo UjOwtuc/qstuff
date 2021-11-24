@@ -1,6 +1,5 @@
 #include "queryvalidator.h"
 
-#include <QMutex>
 #include <QDebug>
 
 #ifdef WITH_LOGSTUFF_QUERY
@@ -15,13 +14,11 @@ qint32 test_parse_list(void* parsers, const char* query_string);
 }
 
 namespace {
-	QMutex mutex;
 	void* parsers = nullptr;
 }
 
 qint32 check_parseable(QueryValidator::ParseRule rule, const QString& value)
 {
-	QMutexLocker lock(&mutex);
 	if (! parsers)
 	{
 		qDebug() << "initializing parsers";
