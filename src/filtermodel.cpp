@@ -5,34 +5,36 @@
 #include <QDebug>
 
 namespace {
-	QMap<FilterExpression::Op, QString> opStrings;
+	QMap<FilterExpression::Op, QString>* opStrings = nullptr;
 
 	void fillGlobalMaps()
 	{
-		opStrings.insert(FilterExpression::Eq, "=");
-		opStrings.insert(FilterExpression::Lt, "<");
-		opStrings.insert(FilterExpression::Le, "<=");
-		opStrings.insert(FilterExpression::Gt, ">");
-		opStrings.insert(FilterExpression::Ge, ">=");
-		opStrings.insert(FilterExpression::In, "in");
-		opStrings.insert(FilterExpression::Like, "like");
+		if (! opStrings)
+		{
+			opStrings = new QMap<FilterExpression::Op, QString>();
+			opStrings->insert(FilterExpression::Eq, "=");
+			opStrings->insert(FilterExpression::Lt, "<");
+			opStrings->insert(FilterExpression::Le, "<=");
+			opStrings->insert(FilterExpression::Gt, ">");
+			opStrings->insert(FilterExpression::Ge, ">=");
+			opStrings->insert(FilterExpression::In, "in");
+			opStrings->insert(FilterExpression::Like, "like");
+		}
 	}
 }
 
 
 const QMap<FilterExpression::Op, QString>& FilterExpression::ops()
 {
-	if (opStrings.isEmpty())
-		fillGlobalMaps();
-	return opStrings;
+	fillGlobalMaps();
+	return *opStrings;
 }
 
 
 QString FilterExpression::opString(FilterExpression::Op op)
 {
-	if (opStrings.isEmpty())
-		fillGlobalMaps();
-	return opStrings[op];
+	fillGlobalMaps();
+	return opStrings->value(op);
 }
 
 
@@ -91,7 +93,7 @@ bool FilterExpression::operator!=(const FilterExpression& rhs) const
 
 QString FilterExpression::toString() const
 {
-	return QString("%1%2 %3 %4").arg(m_inverted ? "not " : "").arg(m_id).arg(opString(m_op)).arg(m_value);
+	return QString("%1%2 %3 %4").arg(m_inverted ? "not " : "", m_id, opString(m_op), m_value);
 }
 
 FilterExpression FilterExpression::inverted() const
@@ -166,7 +168,7 @@ QVariant FilterModel::data(const QModelIndex& index, int role) const
 QStringList FilterModel::enabledExpressions() const
 {
 	QStringList result;
-	for (auto filter : m_filters)
+	for (const FilterExpression& filter : qAsConst(m_filters))
 	{
 		if (filter.enabled() && ! filter.isEmpty())
 			result << filter.toString();
@@ -191,7 +193,7 @@ int FilterModel::addFilter(const FilterExpression& expr)
 		if (m_filters[row].enabled() != expr.enabled())
 		{
 			m_filters[row].setEnabled(expr.enabled());
-			dataChanged(index(row), index(row));
+			emit dataChanged(index(row), index(row));
 		}
 	}
 	else
@@ -224,7 +226,7 @@ bool FilterModel::setData(const QModelIndex& index, const QVariant& value, int r
 		{
 			case Qt::UserRole:
 				m_filters[index.row()] = value.value<FilterExpression>();
-				dataChanged(index, index);
+				emit dataChanged(index, index);
 				ok = true;
 				break;
 			case Qt::CheckStateRole:
@@ -234,7 +236,7 @@ bool FilterModel::setData(const QModelIndex& index, const QVariant& value, int r
 				break;
 			case Qt::DisplayRole:
 				m_filters[index.row()].setLabel(value.toString());
-				dataChanged(index, index);
+				emit dataChanged(index, index);
 				ok = true;
 				break;
 		}
@@ -266,7 +268,7 @@ bool FilterModel::setAllEnabled(bool enabled)
 	}
 	if (first >= 0)
 	{
-		dataChanged(index(first), index(last));
+		emit dataChanged(index(first), index(last));
 		return true;
 	}
 	return false;
@@ -291,7 +293,7 @@ bool FilterModel::invertFilter(const QModelIndex& index)
 	if (index.row() >= 0 && index.row() < m_filters.size())
 	{
 		m_filters[index.row()] = m_filters[index.row()].inverted();
-		dataChanged(index, index);
+		emit dataChanged(index, index);
 		return true;
 	}
 	return false;

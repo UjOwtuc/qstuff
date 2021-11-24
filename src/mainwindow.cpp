@@ -145,7 +145,7 @@ QStuffMainWindow::QStuffMainWindow()
 
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
 	connect(m_netAccess, &QNetworkAccessManager::finished, this, &QStuffMainWindow::requestFinished);
-	connect(m_netAccess, &QNetworkAccessManager::sslErrors, [this](QNetworkReply* reply, const QList<QSslError>& errors){
+	connect(m_netAccess, &QNetworkAccessManager::sslErrors, this, [](QNetworkReply* reply, const QList<QSslError>& errors){
 		qDebug() << "ssl errors:" << errors;
 	});
 	connect(m_widget->timerangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::currentTimerangeChanged);
@@ -158,16 +158,17 @@ QStuffMainWindow::QStuffMainWindow()
 	addAction(refresh);
 
 	connect(m_widget->action_saveView, &QAction::triggered, this, &QStuffMainWindow::saveView);
-	connect(m_widget->action_resetView, &QAction::triggered, [this]{
+	connect(m_widget->action_resetView, &QAction::triggered, this, [this]{
 		m_logModel->setColumns({"hostname", "programname", "msg"});
 		m_widget->logsTable->resizeColumnsToContents();
 	});
 
 	settings.beginGroup("views");
-	for (auto name : settings.childGroups())
+	const QStringList& viewNames = settings.childGroups();
+	for (const QString& name : qAsConst(viewNames))
 	{
 		QAction* loadViewAction = new QAction(name, this);
-		connect(loadViewAction, &QAction::triggered, [this,name]{
+		connect(loadViewAction, &QAction::triggered, this, [this,name]{
 			loadView(name);
 		});
 		m_widget->menu_view->addAction(loadViewAction);
@@ -190,7 +191,6 @@ void QStuffMainWindow::search()
 	QDateTime start = timerange.first.toDateTime();
 	QDateTime end = timerange.second.toDateTime();
 
-// 	qDebug() << "search from" << start << "to" << end << "for" << m_widget->queryInputCombo->currentText();
 	if (start.msecsTo(end) > 0)
 	{
 		if (focusWidget() == m_widget->timerangeCombo)
@@ -210,7 +210,7 @@ void QStuffMainWindow::search()
 			if (query.isEmpty())
 				query = input;
 			else
-				query = QString("(%1) and %2").arg(query).arg(input);
+				query = QString("(%1) and %2").arg(query, input);
 		}
 
 		queryItems.addQueryItem("limit_events", QString::number(m_searchMaxEvents));
@@ -219,6 +219,7 @@ void QStuffMainWindow::search()
 		queryItems.addQueryItem("query", query);
 		QUrl url(m_searchUrl);
 		url.setQuery(queryItems);
+		qDebug() << "search URL:" << url;
 		QNetworkRequest req(url);
 		if (m_sslConfiguration)
 			req.setSslConfiguration(*m_sslConfiguration);
@@ -231,7 +232,7 @@ void QStuffMainWindow::search()
 		progress->setRange(0, 0);
 		m_widget->statusbar->addWidget(progress);
 
-		connect(reply, &QNetworkReply::downloadProgress, [progress,taskLabel](quint64 received, quint64 total){
+		connect(reply, &QNetworkReply::downloadProgress, this, [progress,taskLabel](quint64 received, quint64 total){
 			progress->setMaximum(total);
 			progress->setValue(received);
 			taskLabel->setText("Receiving events");
@@ -485,7 +486,7 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 		{
 			QString key = m_keysModel->data(m_keysModel->index(index.row(), 0, index.parent()), Qt::DisplayRole).toString();
 			QAction* toggle = new QAction("Toggle column in log view", contextMenu);
-			connect(toggle, &QAction::triggered, [this, key]{
+			connect(toggle, &QAction::triggered, this, [this, key]{
 				m_logModel->toggleColumn(key);
 				m_widget->logsTable->resizeColumnsToContents();
 			});
@@ -499,14 +500,14 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 			// TODO: escape quotes in value
 			value = QString("\"%1\"").arg(value);
 			QAction* filter = new QAction("Filter for value", contextMenu);
-			connect(filter, &QAction::triggered, [this, key, value]{
+			connect(filter, &QAction::triggered, this, [this, key, value]{
 				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value, false)) >= 0)
 					search();
 			});
 			contextMenu->addAction(filter);
 
 			QAction* filterNot = new QAction("Filter out value", contextMenu);
-			connect(filterNot, &QAction::triggered, [this, key, value]{
+			connect(filterNot, &QAction::triggered, this, [this, key, value]{
 				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value, true)) >= 0)
 					search();
 			});
@@ -541,7 +542,7 @@ void QStuffMainWindow::loadView(const QString& name)
 
 	QList<FilterExpression> filters = loadFiltersArray(settings);
 	m_filterModel->setAllEnabled(false);
-	for (auto filter : filters)
+	for (const FilterExpression& filter : qAsConst(filters))
 		m_filterModel->addFilter(filter);
 
 	search();
@@ -654,51 +655,51 @@ void QStuffMainWindow::setupFilterView()
 
 	QSettings settings;
 	QList<FilterExpression> filters = loadFiltersArray(settings);
-	for (auto filter : filters)
+	for (const FilterExpression& filter : qAsConst(filters))
 		m_filterModel->addFilter(filter);
 
 	connect(m_widget->filterList->itemDelegate(), &QAbstractItemDelegate::commitData, this, &QStuffMainWindow::search);
 	connect(m_filterModel, &FilterModel::checkStateChanged, this, &QStuffMainWindow::search);
-	connect(m_widget->addFilterButton, &QToolButton::clicked, [this]{
+	connect(m_widget->addFilterButton, &QToolButton::clicked, this, [this]{
 		int row = m_filterModel->addFilter(FilterExpression());
 		m_widget->filterList->edit(m_filterModel->index(row));
 	});
-	connect(m_widget->enableAllFiltersButton, &QToolButton::clicked, [this]{
+	connect(m_widget->enableAllFiltersButton, &QToolButton::clicked, this, [this]{
 		if(m_filterModel->setAllEnabled(true))
 			search();
 	});
-	connect(m_widget->disableAllFiltersButton, &QToolButton::clicked, [this]{
+	connect(m_widget->disableAllFiltersButton, &QToolButton::clicked, this, [this]{
 		if (m_filterModel->setAllEnabled(false))
 			search();
 	});
-	connect(m_widget->removeAllFiltersButton, &QToolButton::clicked, [this]{
+	connect(m_widget->removeAllFiltersButton, &QToolButton::clicked, this, [this]{
 		if (m_filterModel->removeAllFilters())
 			search();
 	});
 
-	connect(m_widget->invertFilterButton, &QToolButton::clicked, [this]{
+	connect(m_widget->invertFilterButton, &QToolButton::clicked, this, [this]{
 		bool changed = false;
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
 		if (! selected.isEmpty())
 		{
-			for (auto index : selected)
+			for (auto index : qAsConst(selected))
 				changed |= m_filterModel->invertFilter(index);
 		}
 		if (changed)
 			search();
 	});
-	connect(m_widget->removeFilterButton, &QToolButton::clicked, [this]{
+	connect(m_widget->removeFilterButton, &QToolButton::clicked, this, [this]{
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
 		if (! selected.isEmpty())
 		{
 			QSignalBlocker blocker(m_filterModel);
-			for (auto index : selected)
+			for (auto index : qAsConst(selected))
 				m_filterModel->removeRow(index.row());
 			search();
 		}
 	});
 
-	connect(m_widget->filterList->selectionModel(), &QItemSelectionModel::selectionChanged, [this]{
+	connect(m_widget->filterList->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this]{
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
 		bool enable_buttons = ! selected.isEmpty();
 		m_widget->invertFilterButton->setEnabled(enable_buttons);
@@ -719,7 +720,7 @@ void QStuffMainWindow::setupChartView()
 	m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
 	m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand)
 ;
-	connect(m_countsChart->xAxis(), &QDateTimeAxis::rangeChanged, [this](QDateTime min, QDateTime max){
+	connect(m_countsChart->xAxis(), &QDateTimeAxis::rangeChanged, this, [this](QDateTime min, QDateTime max){
 		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
 		m_widget->timerangeCombo->setCurrentIndex(index);
 	});

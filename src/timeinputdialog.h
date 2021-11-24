@@ -20,7 +20,7 @@ public:
 	{}
 
 	explicit TimeSpec(const QDateTime& absolute)
-		: m_kind(Absolute), m_absolute(absolute)
+		: m_kind(Absolute), m_absolute(absolute), m_relativeValue(0), m_relativeUnit(Minutes)
 	{}
 
 	TimeSpec(int value, Unit unit)

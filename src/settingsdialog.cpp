@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QTimer>
 #include <QFileDialog>
+#include <QSpinBox>
 
 #include "ui_settingsdialog.h"
 
@@ -40,7 +41,7 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 	completer->setModel(new FileSystemModel(completer));
 	m_widget->trustedCertsEdit->setCompleter(completer);
 
-	connect(m_widget->trustedCertsEdit, &QLineEdit::textChanged, [this, completer](const QString& text){
+	connect(m_widget->trustedCertsEdit, &QLineEdit::textChanged, this, [this, completer](const QString& text){
 		QFileInfo file(text);
 		if (file.exists() && file.isDir())
 		{
@@ -51,9 +52,10 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 			}
 			QMetaObject::invokeMethod(completer, "complete", Qt::QueuedConnection);
 		}
+		emit trustedCertsChanged(text);
 	});
 
-	connect(m_widget->trustedCertsBrowseButton, &QToolButton::clicked, [this]{
+	connect(m_widget->trustedCertsBrowseButton, &QToolButton::clicked, this, [this]{
 		QString filename = QFileDialog::getOpenFileName(
 			this,
 			"Trusted Certificate Bundle",
@@ -63,6 +65,8 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 		if (! filename.isEmpty())
 			m_widget->trustedCertsEdit->setText(filename);
 	});
+
+	connect(m_widget->maxEventsSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), this, &SettingsDialog::maxEventsChanged);
 }
 
 

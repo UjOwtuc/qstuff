@@ -11,22 +11,14 @@ namespace Ui {
 class QStringListModel;
 class QueryValidator;
 
-
 class SyntaxCheckedLineedit : public QLineEdit
 {
 	Q_OBJECT
-	Q_PROPERTY(QColor okColor READ okColor WRITE setOkColor USER true);
-	Q_PROPERTY(QColor problemColor READ problemColor WRITE setProblemColor USER true);
-	Q_PROPERTY(QPalette::ColorRole colorRole READ colorRole WRITE setColorRole USER true);
+	Q_PROPERTY(QColor okColor MEMBER m_okColor USER true);
+	Q_PROPERTY(QColor problemColor MEMBER m_problemColor USER true);
+	Q_PROPERTY(QPalette::ColorRole colorRole MEMBER m_colorRole USER true);
 public:
 	explicit SyntaxCheckedLineedit(QWidget* parent = nullptr);
-
-	const QColor& okColor() const { return m_okColor; }
-	void setOkColor(const QColor& color) { m_okColor = color; }
-	const QColor& problemColor() const { return m_problemColor; }
-	void setProblemColor(const QColor& color) { m_problemColor = color; }
-	QPalette::ColorRole colorRole() const { return m_colorRole; }
-	void setColorRole(QPalette::ColorRole group) { m_colorRole = group; }
 
 public slots:
 	void checkContent();
@@ -41,8 +33,8 @@ private:
 class EditFilterWidget : public QWidget
 {
 	Q_OBJECT
-	Q_PROPERTY(FilterExpression expression READ expression WRITE setExpression USER true);
-	Q_PROPERTY(QString label READ label WRITE setLabel USER true);
+	Q_PROPERTY(FilterExpression expression READ expression WRITE setExpression NOTIFY expressionChanged USER true);
+	Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged USER true);
 public:
 	explicit EditFilterWidget(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
 
@@ -56,6 +48,10 @@ public:
 
 public slots:
 	void updateValueCompletions();
+
+signals:
+	void expressionChanged();
+	void labelChanged(QString label);
 
 private:
 	Ui::EditFilterWidget* m_widget;

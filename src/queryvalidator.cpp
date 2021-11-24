@@ -27,7 +27,8 @@ qint32 check_parseable(QueryValidator::ParseRule rule, const QString& value)
 		qDebug() << "initializing parsers";
 		parsers = init_parsers();
 	}
-	const char* s = value.toUtf8().constData();
+	QByteArray raw = value.toUtf8();
+	const char* s = raw.constData();
 	switch (rule)
 	{
 		case QueryValidator::Query: return test_parse_query(parsers, s);

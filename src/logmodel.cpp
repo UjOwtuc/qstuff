@@ -107,3 +107,4 @@ void LogModel::setColumns(const QStringList& columns)
 		endInsertColumns();
 	}
 }
+

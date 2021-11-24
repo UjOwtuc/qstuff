@@ -12,3 +12,4 @@ bool KeyFilterProxyModel::filterAcceptsRow ( int row, const QModelIndex& parent 
 		return true;
 	return QSortFilterProxyModel::filterAcceptsRow(row, parent);
 }
+

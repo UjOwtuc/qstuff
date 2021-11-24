@@ -31,7 +31,7 @@ QVariant TimerangeModel::data(const QModelIndex& index, int role) const
 		if (index.row() < m_data.size())
 		{
 			auto data = m_data[index.row()];
-			result.setValue(QString("%1 to %2").arg(data.first.toString()).arg(data.second.toString()));
+			result.setValue(QString("%1 to %2").arg(data.first.toString(), data.second.toString()));
 		}
 		else
 			result.setValue(QString("Custom ..."));

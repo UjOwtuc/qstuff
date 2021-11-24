@@ -7,7 +7,7 @@
 class LogModel : public QAbstractTableModel
 {
 public:
-	LogModel(const QStringList& columns, QObject* parent = nullptr);
+	explicit LogModel(const QStringList& columns, QObject* parent = nullptr);
 
 	int columnCount(const QModelIndex& /*parent*/) const;
 	int rowCount(const QModelIndex& /*parent*/) const;

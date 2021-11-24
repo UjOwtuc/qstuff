@@ -5,7 +5,9 @@
 
 class QueryValidator : public QValidator
 {
-	Q_PROPERTY(ParseRule rule READ rule WRITE setRule USER true);
+	Q_OBJECT
+	Q_PROPERTY(ParseRule rule MEMBER m_rule WRITE setRule USER true);
+
 public:
 	enum ParseRule {
 		Query = 0,
@@ -18,12 +20,12 @@ public:
 	QValidator::State validate(QString& input, int& /*pos*/) const override;
 	void fixup(QString& input) const override;
 
-	ParseRule rule() const { return m_rule; }
-	void setRule(ParseRule value) { m_rule = value; }
+	void setRule(ParseRule rule) { m_rule = rule; }
 
 private:
 	ParseRule m_rule;
 };
+Q_DECLARE_METATYPE(QueryValidator::ParseRule);
 
 qint32 check_parseable(QueryValidator::ParseRule rule, const QString& value);
 

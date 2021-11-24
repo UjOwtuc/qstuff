@@ -11,11 +11,11 @@
 
 
 SyntaxCheckedLineedit::SyntaxCheckedLineedit(QWidget* parent)
-	: QLineEdit(parent)
+	: QLineEdit(parent),
+	m_colorRole(QPalette::Text),
+	m_okColor(Qt::black),
+	m_problemColor(Qt::red)
 {
-	m_colorRole = QPalette::Text;
-	m_okColor = Qt::black;
-	m_problemColor = Qt::red;
 	connect(this, &QLineEdit::textChanged, this, &SyntaxCheckedLineedit::checkContent);
 }
 
@@ -50,7 +50,7 @@ EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
 	m_widget->idCombo->setValidator(new QueryValidator(QueryValidator::Field, this));
 	m_widget->valueCombo->setLineEdit(new SyntaxCheckedLineedit(this));
 	m_widget->valueCombo->setValidator(m_validator);
-	connect(m_widget->opCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index){
+	connect(m_widget->opCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
 		if (index < 0)
 			m_widget->opCombo->setCurrentIndex(0);
 		else
@@ -72,8 +72,13 @@ EditFilterWidget::EditFilterWidget(QWidget* parent, Qt::WindowFlags f)
 			}
 			qobject_cast<SyntaxCheckedLineedit*>(m_widget->valueCombo->lineEdit())->checkContent();
 		}
+		emit expressionChanged();
 	});
 	setFocusProxy(m_widget->idCombo);
+
+	connect(m_widget->idCombo, &QComboBox::currentTextChanged, this, &EditFilterWidget::expressionChanged);
+	connect(m_widget->valueCombo, &QComboBox::currentTextChanged, this, &EditFilterWidget::expressionChanged);
+	connect(m_widget->customLabelEdit, &QLineEdit::textChanged, this, &EditFilterWidget::labelChanged);
 }
 
 
@@ -113,6 +118,7 @@ void EditFilterWidget::setExpression(const FilterExpression& expression)
 
 	if (expression.hasCustomLabel())
 		setLabel(expression.label());
+	emit expressionChanged();
 }
 
 
@@ -129,6 +135,7 @@ void EditFilterWidget::setLabel(const QString& label)
 		m_widget->customLabelEdit->setText(label);
 		m_labelChanged = true;
 	}
+	emit labelChanged(label);
 }
 
 
@@ -150,7 +157,7 @@ void EditFilterWidget::updateValueCompletions()
 	QStringList completions;
 	if (parentIndex.isValid())
 	{
-		int rowCount = m_completionsModel->rowCount(parentIndex);
+		rowCount = m_completionsModel->rowCount(parentIndex);
 		for (int row=0; row < rowCount; ++row)
 			completions << m_completionsModel->data(m_completionsModel->index(row, 0, parentIndex)).toString();
 	}

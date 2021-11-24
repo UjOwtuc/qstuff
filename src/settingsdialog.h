@@ -9,9 +9,10 @@ namespace Ui {
 
 class SettingsDialog : public QDialog
 {
-	Q_PROPERTY(QString stuffstream_url READ stuffstreamUrl WRITE setStuffstreamUrl USER true);
-	Q_PROPERTY(quint64 max_events READ maxEvents WRITE setMaxEvents USER true);
-	Q_PROPERTY(QString trusted_certs READ trustedCerts WRITE setTrustedCerts USER true);
+	Q_OBJECT
+	Q_PROPERTY(QString stuffstream_url READ stuffstreamUrl WRITE setStuffstreamUrl NOTIFY urlChanged USER true);
+	Q_PROPERTY(quint64 max_events READ maxEvents WRITE setMaxEvents NOTIFY maxEventsChanged USER true);
+	Q_PROPERTY(QString trusted_certs READ trustedCerts WRITE setTrustedCerts NOTIFY trustedCertsChanged USER true);
 
 public:
 	explicit SettingsDialog(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
@@ -24,6 +25,11 @@ public:
 
 	QString trustedCerts() const;
 	void setTrustedCerts(const QString& value);
+
+signals:
+	void urlChanged(QString);
+	void maxEventsChanged(quint64);
+	void trustedCertsChanged(QString);
 
 private:
 	Ui::SettingsDialog* m_widget;
