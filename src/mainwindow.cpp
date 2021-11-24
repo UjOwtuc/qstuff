@@ -620,9 +620,7 @@ void QStuffMainWindow::setCaCertificate(const QString& filename)
 	if (! filename.isEmpty())
 	{
 		m_sslConfiguration = new QSslConfiguration(QSslConfiguration::defaultConfiguration());
-		QFile f(filename);
-		f.open(QIODevice::ReadOnly);
-		m_sslConfiguration->addCaCertificates(QSslCertificate::fromData(f.readAll()));
+		m_sslConfiguration->addCaCertificates(QSslCertificate::fromPath(filename));
 	}
 }
 
