@@ -98,14 +98,23 @@ void CountsChart::setInterval(int seconds)
 			label = "minute";
 			break;
 		case 61 ... 3599:
-			label = QString("%1:%2 minutes").arg(int(seconds / 60)).arg(seconds % 60);
+			if (seconds % 60)
+				label = QString("%1:%2 minutes").arg(int(seconds / 60)).arg(seconds % 60, 2, QChar('0'));
+			else
+				label = QString("%1 minutes").arg(int(seconds / 60));
 			break;
 		case 3600:
 			label = "hour";
 			break;
 		case 3601 ... 24 * 3600 -1:
-			label = QTime::fromMSecsSinceStartOfDay(1000 * seconds).toString("HH:mm:ss");
+		{
+			int minutes = seconds / 60;
+			if (minutes % 60)
+				label = QString("%1:%2 hours").arg(int(minutes / 60)).arg(minutes % 60, 2, QChar('0'));
+			else
+				label = QString("%1 hours").arg(int(minutes / 60));
 			break;
+		}
 		case 24 * 3600:
 			label = "day";
 			break;
