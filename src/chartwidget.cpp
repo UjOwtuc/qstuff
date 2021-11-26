@@ -60,15 +60,16 @@ ChartWidget::ChartWidget(QWidget* parent)
 	m_widget->splitCombo->setValidator(validator);
 	m_widget->splitCombo->lineEdit()->setClearButtonEnabled(true);
 
-	m_chart = new QChart();
 	m_xAxis = new QDateTimeAxis();
 	m_xAxis->setTickCount(10);
 	m_xAxis->setTitleText("Time");
-	m_chart->addAxis(m_xAxis, Qt::AlignBottom);
 
 	m_yAxis = new QValueAxis;
 	m_yAxis->setLabelFormat("%i");
 	m_yAxis->setTitleText("Event count");
+
+	m_chart = new QChart();
+	m_chart->addAxis(m_xAxis, Qt::AlignBottom);
 	m_chart->addAxis(m_yAxis, Qt::AlignLeft);
 	m_chart->layout()->setContentsMargins(0, 0, 0, 0);
 	m_chart->setMargins(QMargins());
@@ -104,9 +105,11 @@ void ChartWidget::fetchCounts(const QDateTime& start, const QDateTime& end, cons
 }
 
 
-QLineSeries* generateSeries(const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<quint64(const QVariantMap::const_iterator&)>& valueGetter)
+void ChartWidget::generateSeries(const QString& name, const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<quint64(const QVariantMap::const_iterator&)>& valueGetter)
 {
 	QLineSeries* series = new QLineSeries();
+	series->setPointsVisible(true);
+
 	auto end = map.constEnd();
 	for (auto it=map.constBegin(); it!=end; ++it)
 	{
@@ -121,12 +124,23 @@ QLineSeries* generateSeries(const QVariantMap& map, quint64& minValue, quint64& 
 		else
 			qDebug() << "invalid date in points:" << it.key();
 	}
-	return series;
+
+	QSignalBlocker blocker(m_xAxis);
+	m_chart->addSeries(series);
+	series->attachAxis(m_xAxis);
+	series->attachAxis(m_yAxis);
+
+	if (! name.isEmpty())
+	{
+		connect(series, &QXYSeries::clicked, this, [this, name]{
+			emit lineClicked(name);
+		});
+		series->setName(name);
+	}
 }
 
 void ChartWidget::update(const QVariantMap& points)
 {
-	QSignalBlocker blocker(m_xAxis);
 	m_chart->removeAllSeries();
 
 	if (points.isEmpty())
@@ -136,12 +150,11 @@ void ChartWidget::update(const QVariantMap& points)
 	const QDateTime maxX = QDateTime::fromString(points.lastKey(), Qt::ISODate);
 	quint64 minY=std::numeric_limits<quint64>::max(), maxY=0;
 
-	QList<QLineSeries*> lines;
 	QVariant firstValue = points.first();
 	if (firstValue.canConvert(QMetaType::ULongLong))
 	{
 		m_chart->legend()->hide();
-		lines << generateSeries(points, minY, maxY, [](const QVariantMap::const_iterator& it) {
+		generateSeries("", points, minY, maxY, [](const QVariantMap::const_iterator& it) {
 			return it->toULongLong();
 		});
 	}
@@ -151,26 +164,17 @@ void ChartWidget::update(const QVariantMap& points)
 		QStringList names = firstValue.toMap().keys();
 		for (const QString& name : qAsConst(names))
 		{
-			QLineSeries* line = generateSeries(points, minY, maxY, [name](const QVariantMap::const_iterator& it) {
+			generateSeries(name, points, minY, maxY, [name](const QVariantMap::const_iterator& it) {
 				return it->toMap()[name].toULongLong();
 			});
-			line->setName(name);
-			lines << line;
 		}
-	}
-
-	for (QLineSeries* series : qAsConst(lines))
-	{
-		series->setPointsVisible(true);
-		m_chart->addSeries(series);
-		series->attachAxis(m_xAxis);
-		series->attachAxis(m_yAxis);
 	}
 
 	auto it = points.constKeyValueBegin();
 	++it;
 	const QDateTime secondPoint = QDateTime::fromString(it->first, Qt::ISODate);
 	m_yAxis->setTitleText(QString("Events per %1").arg(prettyInterval(minX.secsTo(secondPoint))));
+
 	qint64 duration = minX.secsTo(maxX);
 	switch (duration)
 	{
@@ -187,6 +191,7 @@ void ChartWidget::update(const QVariantMap& points)
 			m_xAxis->setFormat("dd.MM.yyyy HH:mm");
 	}
 
+	QSignalBlocker blocker(m_xAxis);
 	m_xAxis->setRange(minX, maxX);
 	m_yAxis->setRange(minY, maxY);
 }

@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QDateTime>
+#include <QVariant>
 
 namespace Ui {
 	class ChartWidget;
@@ -41,9 +42,11 @@ signals:
 	void timerangeSelected(QDateTime min, QDateTime max);
 	void splitByChanged(QString value);
 	void limitBucketsChanged(quint32 value);
+	void lineClicked(const QString& name);
 
 protected:
 	void showEvent(QShowEvent* event) override;
+	void generateSeries(const QString& name, const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<quint64(const QVariantMap::const_iterator&)>& valueGetter);
 
 private:
 	Ui::ChartWidget* m_widget;

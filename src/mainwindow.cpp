@@ -668,6 +668,11 @@ void QStuffMainWindow::setupChartView()
 
 	connect(this, &QStuffMainWindow::startSearch, m_chartWidget, &ChartWidget::fetchCounts);
 
+	connect(m_chartWidget, &ChartWidget::lineClicked, this, [this](const QString& value){
+		m_filterModel->addFilter(FilterExpression(m_chartWidget->splitBy(), FilterExpression::Eq, QString("\"%1\"").arg(value), false));
+		m_chartWidget->setSplitBy("");
+	});
+
 	QAction* toggleChart = m_widget->chartDock->toggleViewAction();
 	toggleChart->setText("Show &Chart");
 	m_widget->menu_Window->addAction(toggleChart);
