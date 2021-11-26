@@ -671,6 +671,8 @@ void QStuffMainWindow::setupChartView()
 	QAction* toggleChart = m_widget->chartDock->toggleViewAction();
 	toggleChart->setText("Show &Chart");
 	m_widget->menu_Window->addAction(toggleChart);
+
+	m_chartWidget->setSplitChoices(m_keysModel);
 }
 
 

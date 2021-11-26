@@ -59,7 +59,6 @@ ChartWidget::ChartWidget(QWidget* parent)
 	validator->setAcceptEmpty(true);
 	m_widget->splitCombo->setValidator(validator);
 	m_widget->splitCombo->lineEdit()->setClearButtonEnabled(true);
-	// TODO completer
 
 	m_chart = new QChart();
 	m_xAxis = new QDateTimeAxis();
@@ -83,6 +82,14 @@ ChartWidget::ChartWidget(QWidget* parent)
 	connect(m_widget->splitCombo->lineEdit(), &QLineEdit::editingFinished, this, &ChartWidget::fetchIfSplitValueChanged);
 	connect(m_widget->splitCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChartWidget::fetchIfSplitValueChanged);
 	connect(m_widget->limitBucketsSpinbox, &QSpinBox::editingFinished, this, &ChartWidget::fetchIfSplitValueChanged);
+}
+
+
+void ChartWidget::setSplitChoices(QAbstractItemModel* model)
+{
+	QCompleter* completer = new QCompleter(this);
+	completer->setModel(model);
+	m_widget->splitCombo->setCompleter(completer);
 }
 
 

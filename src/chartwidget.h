@@ -12,6 +12,7 @@ namespace QtCharts {
 	class QDateTimeAxis;
 	class QValueAxis;
 }
+class QAbstractItemModel;
 
 class ChartWidget : public QWidget
 {
@@ -23,6 +24,8 @@ public:
 
 	QString splitBy() const;
 	quint32 limitBuckets() const;
+
+	void setSplitChoices(QAbstractItemModel* model);
 
 public slots:
 	void fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query);
