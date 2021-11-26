@@ -16,19 +16,24 @@ namespace QtCharts {
 class ChartWidget : public QWidget
 {
 	Q_OBJECT
+	Q_PROPERTY(QString splitBy READ splitBy WRITE setSplitBy NOTIFY splitByChanged USER true);
 public:
 	explicit ChartWidget(QWidget* parent = nullptr);
+
+	QString splitBy() const;
 
 public slots:
 	void fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query);
 	void update(const QVariantMap& points);
 	void fetchIfSplitValueChanged();
+	void setSplitBy(const QString& value);
 
 protected slots:
 	void sendFetchRequest();
 
 signals:
 	void timerangeSelected(QDateTime min, QDateTime max);
+	void splitByChanged(QString value);
 
 protected:
 	void showEvent(QShowEvent* event) override;

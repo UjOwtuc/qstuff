@@ -189,8 +189,22 @@ void ChartWidget::fetchIfSplitValueChanged()
 	if (m_widget->splitCombo->currentText() != m_currentSplitValue)
 	{
 		m_currentSplitValue = m_widget->splitCombo->currentText();
+		emit splitByChanged(m_currentSplitValue);
 		sendFetchRequest();
 	}
+}
+
+
+QString ChartWidget::splitBy() const
+{
+	return m_widget->splitCombo->currentText();
+}
+
+
+void ChartWidget::setSplitBy(const QString& value)
+{
+	m_widget->splitCombo->setCurrentText(value);
+	fetchIfSplitValueChanged();
 }
 
 

@@ -411,6 +411,11 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 				m_widget->logsTable->resizeColumnsToContents();
 			});
 			contextMenu->addAction(toggle);
+			QAction* split = new QAction("Split chart by key", contextMenu);
+			connect(split, &QAction::triggered, this, [this, key]{
+				m_chartWidget->setSplitBy(key);
+			});
+			contextMenu->addAction(split);
 		}
 		else
 		{
