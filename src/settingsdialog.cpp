@@ -18,6 +18,7 @@ public:
 	{
 		setRootPath(QString());
 	}
+
 	QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override
 	{
 		if (role == Qt::DisplayRole && index.column() == 0)
@@ -40,6 +41,11 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 	QCompleter* completer = new QCompleter(this);
 	completer->setModel(new FileSystemModel(completer));
 	m_widget->trustedCertsEdit->setCompleter(completer);
+
+	m_widget->scaleIntervalCombo->addItem("Don't scale", 0);
+	m_widget->scaleIntervalCombo->addItem("1 second", 1);
+	m_widget->scaleIntervalCombo->addItem("1 minute", 60);
+	m_widget->scaleIntervalCombo->addItem("1 hour", 3600);
 
 	connect(m_widget->trustedCertsEdit, &QLineEdit::textChanged, this, [this, completer](const QString& text){
 		QFileInfo file(text);
@@ -103,4 +109,22 @@ QString SettingsDialog::trustedCerts() const
 void SettingsDialog::setTrustedCerts(const QString& value)
 {
 	m_widget->trustedCertsEdit->setText(value);
+}
+
+
+quint64 SettingsDialog::scaleInterval() const
+{
+	return m_widget->scaleIntervalCombo->currentData().toULongLong();
+}
+
+
+void SettingsDialog::setScaleInterval(quint64 value)
+{
+	int index = m_widget->scaleIntervalCombo->findData(value);
+	if (! index)
+	{
+		m_widget->scaleIntervalCombo->addItem(QString("%1 seconds").arg(value), value);
+		index = m_widget->scaleIntervalCombo->findData(value);
+	}
+	m_widget->scaleIntervalCombo->setCurrentIndex(index);
 }

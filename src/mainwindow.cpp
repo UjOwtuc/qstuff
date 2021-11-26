@@ -549,21 +549,25 @@ void QStuffMainWindow::showSettingsDialog()
 	dlg.setStuffstreamUrl(client->baseUrl());
 	dlg.setMaxEvents(client->maxEvents());
 	dlg.setTrustedCerts(client->trustedCertificates());
+	dlg.setScaleInterval(m_chartWidget->scaleToInterval());
 
 	if (dlg.exec() == QDialog::Accepted)
 	{
 		QString searchUrl = dlg.stuffstreamUrl();
 		quint64 maxEvents = dlg.maxEvents();
 		QString trustedCerts = dlg.trustedCerts();
+		quint64 scaleToInterval = dlg.scaleInterval();
 
 		QSettings settings;
 		settings.setValue("stuffstream_url", searchUrl);
 		settings.setValue("max_events", maxEvents);
 		settings.setValue("ca_certificate", trustedCerts);
+		settings.setValue("scale_to_interval", scaleToInterval);
 
 		client->setBaseUrl(searchUrl);
 		client->setMaxEvents(maxEvents);
 		client->setTrustedCertificates(trustedCerts);
+		m_chartWidget->setScaleToInterval(scaleToInterval);
 		search();
 	}
 }
@@ -660,6 +664,9 @@ void QStuffMainWindow::setupChartView()
 {
 	m_chartWidget = new ChartWidget(this);
 	m_widget->chartDock->setWidget(m_chartWidget);
+
+	QSettings settings;
+	m_chartWidget->setScaleToInterval(settings.value("scale_to_interval", 0).toULongLong());
 
 	connect(m_chartWidget, &ChartWidget::timerangeSelected, this, [this](QDateTime min, QDateTime max){
 		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));

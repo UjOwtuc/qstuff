@@ -8,7 +8,7 @@
 #include "ui_chartwidget.h"
 
 
-QString prettyInterval(int seconds)
+QString prettyInterval(quint64 seconds)
 {
 	QString pretty;
 	switch (seconds)
@@ -51,6 +51,8 @@ QString prettyInterval(int seconds)
 ChartWidget::ChartWidget(QWidget* parent)
 	: QWidget(parent)
 {
+	m_scaleToInterval = 0;
+
 	m_widget = new Ui::ChartWidget();
 	m_widget->setupUi(this);
 
@@ -69,6 +71,7 @@ ChartWidget::ChartWidget(QWidget* parent)
 	m_yAxis->setTitleText("Event count");
 
 	m_chart = new QChart();
+	m_chart->setLocalizeNumbers(true);
 	m_chart->addAxis(m_xAxis, Qt::AlignBottom);
 	m_chart->addAxis(m_yAxis, Qt::AlignLeft);
 	m_chart->layout()->setContentsMargins(0, 0, 0, 0);
@@ -91,6 +94,15 @@ void ChartWidget::setSplitChoices(QAbstractItemModel* model)
 	QCompleter* completer = new QCompleter(this);
 	completer->setModel(model);
 	m_widget->splitCombo->setCompleter(completer);
+}
+
+
+qreal ChartWidget::scaleValueToInterval(quint64 value)
+{
+	if (m_scaleToInterval == 0)
+		return value;
+
+	return m_scaleToInterval * value / static_cast<qreal>(m_currentInterval);
 }
 
 
@@ -119,7 +131,7 @@ void ChartWidget::generateSeries(const QString& name, const QVariantMap& map, qu
 			quint64 value = valueGetter(it);
 			minValue = std::min(value, minValue);
 			maxValue = std::max(value, maxValue);
-			series->append(dt.toMSecsSinceEpoch(), value);
+			series->append(dt.toMSecsSinceEpoch(), scaleValueToInterval(value));
 		}
 		else
 			qDebug() << "invalid date in points:" << it.key();
@@ -150,6 +162,13 @@ void ChartWidget::update(const QVariantMap& points)
 	const QDateTime maxX = QDateTime::fromString(points.lastKey(), Qt::ISODate);
 	quint64 minY=std::numeric_limits<quint64>::max(), maxY=0;
 
+	auto it = points.constKeyValueBegin();
+	++it;
+	const QDateTime secondPoint = QDateTime::fromString(it->first, Qt::ISODate);
+	m_currentInterval = minX.secsTo(secondPoint);
+	m_yAxis->setTitleText(QString("Events per %1").arg(prettyInterval(m_scaleToInterval == 0 ? m_currentInterval : m_scaleToInterval)));
+
+
 	QVariant firstValue = points.first();
 	if (firstValue.canConvert(QMetaType::ULongLong))
 	{
@@ -170,11 +189,6 @@ void ChartWidget::update(const QVariantMap& points)
 		}
 	}
 
-	auto it = points.constKeyValueBegin();
-	++it;
-	const QDateTime secondPoint = QDateTime::fromString(it->first, Qt::ISODate);
-	m_yAxis->setTitleText(QString("Events per %1").arg(prettyInterval(minX.secsTo(secondPoint))));
-
 	qint64 duration = minX.secsTo(maxX);
 	switch (duration)
 	{
@@ -193,7 +207,13 @@ void ChartWidget::update(const QVariantMap& points)
 
 	QSignalBlocker blocker(m_xAxis);
 	m_xAxis->setRange(minX, maxX);
-	m_yAxis->setRange(minY, maxY);
+	m_yAxis->setRange(scaleValueToInterval(minY), scaleValueToInterval(maxY));
+	m_yAxis->applyNiceNumbers();
+
+	if ((scaleValueToInterval(maxY) - scaleValueToInterval(minY)) < 5)
+		m_yAxis->setLabelFormat("%.2f");
+	else
+		m_yAxis->setLabelFormat("%.0f");
 }
 
 
@@ -241,6 +261,17 @@ void ChartWidget::setLimitBuckets(quint32 value)
 {
 	m_widget->limitBucketsSpinbox->setValue(value);
 	fetchIfSplitValueChanged();
+}
+
+
+void ChartWidget::setScaleToInterval(quint64 value)
+{
+	if (value != m_scaleToInterval)
+	{
+		m_scaleToInterval = value;
+		sendFetchRequest();
+		emit scaleToIntervalChanged(value);
+	}
 }
 
 
