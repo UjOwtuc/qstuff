@@ -93,11 +93,15 @@ QueryValidator::QueryValidator(ParseRule rule, QObject* parent)
 	: QValidator(parent)
 {
 	m_rule = rule;
+	m_acceptEmpty = false;
 }
 
 
 QValidator::State QueryValidator::validate(QString& input, int&) const
 {
+	if (m_acceptEmpty && input.isEmpty())
+		return Acceptable;
+
 	auto error = check_parseable(m_rule, input);
 	QValidator::State state = Intermediate;
 	if (error == -1)

@@ -5,16 +5,16 @@
 #include "timerangemodel.h"
 #include "saveviewdialog.h"
 #include "keyfilterproxymodel.h"
-#include "countschart.h"
 #include "filtermodel.h"
 #include "filterdelegate.h"
 #include "queryvalidator.h"
 #include "editfilterwidget.h"
 #include "settingsdialog.h"
+#include "chartwidget.h"
+#include "stuffstreamclient.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
-#include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -23,43 +23,13 @@
 #include <QTimer>
 #include <QSettings>
 #include <QSortFilterProxyModel>
+#include <QProgressBar>
+#include <QMessageBox>
 
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QChart>
 
 #include "ui_mainwindow.h"
-
-
-QString formatDuration(const QDateTime& start, const QDateTime& end)
-{
-	QStringList result;
-	quint64 difference = start.secsTo(end);
-	if (difference >= 3600 * 24)
-	{
-		quint64 days = difference / (3600 * 24);
-		result << QString("%1 days").arg(days);
-		difference %= 3600 * 24;
-	}
-
-	if (difference >= 3600 || (result.size() && difference > 0))
-	{
-		int hours = difference / 3600;
-		result << QString("%1 hours").arg(hours);
-		difference %= 3600;
-	}
-
-	if (difference >= 60 || (result.size() && difference > 0))
-	{
-		int minutes = difference / 60;
-		result << QString("%1 minutes").arg(minutes);
-		difference %= 60;
-	}
-
-	if (difference > 0 || result.isEmpty())
-		result << QString("%1 seconds").arg(difference);
-
-	return result.join(" ");
-}
 
 
 void saveFiltersArray(QSettings& settings, const QList<FilterExpression>& filters)
@@ -113,8 +83,6 @@ QStuffMainWindow::QStuffMainWindow()
 {
 	m_widget = new Ui::QStuffMainWindow();
 	m_widget->setupUi(this);
-	m_netAccess = new QNetworkAccessManager(this);
-	m_sslConfiguration = nullptr;
 
 	setupKeysView();
 	setupFilterView();
@@ -129,10 +97,6 @@ QStuffMainWindow::QStuffMainWindow()
 	if (! restoreState(settings.value("mainwindow/windowState").toByteArray()))
 		setupReasonableDockWidgetPositions();
 
-	m_searchUrl = settings.value("stuffstream_url", "http://localhost:8080/events").toString();
-	m_searchMaxEvents = settings.value("max_events", 2000).toULongLong();
-	setCaCertificate(settings.value("ca_certificate", "").toString());
-
 	m_logModel = new LogModel(settings.value("default_columns", QStringList({"hostname", "programname", "msg"})).toStringList());
 	m_widget->logsTable->setModel(m_logModel);
 
@@ -140,14 +104,12 @@ QStuffMainWindow::QStuffMainWindow()
 	m_widget->timerangeCombo->setModel(m_timerangeModel);
 
 	m_widget->queryInputCombo->setLineEdit(new SyntaxCheckedLineedit(this));
-	m_widget->queryInputCombo->setValidator(new QueryValidator(QueryValidator::Query, this));
+	QueryValidator* validator = new QueryValidator(QueryValidator::Query, this);
+	validator->setAcceptEmpty(true);
+	m_widget->queryInputCombo->setValidator(validator);
 	m_widget->queryInputCombo->lineEdit()->setClearButtonEnabled(true);
 
 	connect(m_widget->queryInputCombo->lineEdit(), &QLineEdit::returnPressed, this, &QStuffMainWindow::search);
-	connect(m_netAccess, &QNetworkAccessManager::finished, this, &QStuffMainWindow::requestFinished);
-	connect(m_netAccess, &QNetworkAccessManager::sslErrors, this, [](QNetworkReply* reply, const QList<QSslError>& errors){
-		qDebug() << "ssl errors:" << errors;
-	});
 	connect(m_widget->timerangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &QStuffMainWindow::currentTimerangeChanged);
 
 	connect(m_widget->logsTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &QStuffMainWindow::currentLogItemChanged);
@@ -179,13 +141,40 @@ QStuffMainWindow::QStuffMainWindow()
 	loadQueryHistory();
 
 	connect(m_widget->action_Settings, &QAction::triggered, this, &QStuffMainWindow::showSettingsDialog);
+
+	StuffstreamClient* client = StuffstreamClient::get();
+	client->setBaseUrl(settings.value("stuffstream_url", "http://localhost:8080").toString());
+	client->setMaxEvents(settings.value("max_events", 2000).toULongLong());
+	client->setTrustedCertificates(settings.value("ca_certificate", "").toString());
+	connect(client, &StuffstreamClient::sslErrors, this, [](QNetworkReply* reply, const QList<QSslError>& errors){
+		qDebug() << "ssl errors:" << errors;
+	});
+
+	connect(client, &StuffstreamClient::receivedFields, this, &QStuffMainWindow::setKeys);
+	connect(client, &StuffstreamClient::receivedEvents, this, [this](const QVariantList& events){
+		m_widget->detailsTable->clearContents();
+		m_widget->detailsTable->setRowCount(0);
+
+		m_logModel->setLogs(events);
+		m_widget->logsTable->resizeColumnsToContents();
+	});
+	connect(client, &StuffstreamClient::receivedMetadata, this, [this](quint64 estimated, quint64 matched){
+		m_widget->statusbar->showMessage(
+			QString("filter matched %1 of %2 estimated events")
+				.arg(matched)
+				.arg(estimated));
+
+	});
+	connect(client, &StuffstreamClient::requestError, this, [this](const QString& msg){
+		QMessageBox::warning(this, "Request failed", msg);
+	});
+
 	QTimer::singleShot(0, this, &QStuffMainWindow::search);
 }
 
 
 void QStuffMainWindow::search()
 {
-	QUrlQuery queryItems;
 	auto timerange = m_widget->timerangeCombo->currentData(Qt::UserRole).value<QPair<TimeSpec, TimeSpec>>();
 
 	QDateTime start = timerange.first.toDateTime();
@@ -193,13 +182,6 @@ void QStuffMainWindow::search()
 
 	if (start.msecsTo(end) > 0)
 	{
-		if (focusWidget() == m_widget->timerangeCombo)
-			m_lastInputFocus = Timerange;
-		else if (focusWidget() == m_widget->queryInputCombo)
-			m_lastInputFocus = Query;
-		else
-			m_lastInputFocus = Other;
-
 		setInputsEnabled(false);
 		m_widget->statusbar->clearMessage();
 
@@ -213,18 +195,13 @@ void QStuffMainWindow::search()
 				query = QString("(%1) and %2").arg(query, input);
 		}
 
-		queryItems.addQueryItem("limit_events", QString::number(m_searchMaxEvents));
-		queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
-		queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
-		queryItems.addQueryItem("query", query);
-		QUrl url(m_searchUrl);
-		url.setQuery(queryItems);
-		qDebug() << "search URL:" << url;
-		QNetworkRequest req(url);
-		if (m_sslConfiguration)
-			req.setSslConfiguration(*m_sslConfiguration);
-		auto reply = m_netAccess->get(req);
+		StuffstreamClient* client = StuffstreamClient::get();
+		auto reply = client->fetchEvents(start, end, query);
+		emit startSearch(start, end, query);
 
+		connect(reply, &QNetworkReply::finished, this, [this]{
+			setInputsEnabled(true);
+		});
 		QLabel* taskLabel = new QLabel("Waiting for response headers", m_widget->statusbar);
 		m_widget->statusbar->addWidget(taskLabel);
 
@@ -239,67 +216,11 @@ void QStuffMainWindow::search()
 		});
 		connect(reply, &QNetworkReply::finished, progress, &QProgressBar::deleteLater);
 		connect(reply, &QNetworkReply::finished, taskLabel, &QProgressBar::deleteLater);
-
-		reply->setProperty("duration string", formatDuration(start, end));
 	}
 }
 
 
-void QStuffMainWindow::requestFinished(QNetworkReply* reply)
-{
-	auto error = reply->error();
-	if (error == QNetworkReply::NoError)
-	{
-		m_widget->detailsTable->clearContents();
-		m_widget->detailsTable->setRowCount(0);
-		QJsonParseError parseError;
-		QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
-		if (parseError.error == QJsonParseError::NoError)
-		{
-			QJsonObject obj(doc.object());
-			QJsonObject topFields = obj["fields"].toObject();
-			setKeys(topFields);
-
-			QJsonArray events = obj["events"].toArray();
-			m_logModel->setLogs(events.toVariantList());
-			m_widget->logsTable->resizeColumnsToContents();
-
-			QVariantMap metadata = obj["metadata"].toObject().toVariantMap();
-			quint64 eventCount = metadata["event_count"].toULongLong();
-			quint64 displayed = m_logModel->rowCount(QModelIndex());
-
-			m_widget->statusbar->showMessage(
-				QString("filter matched %1 of %2 estimated events in %3")
-					.arg(displayed)
-					.arg(eventCount)
-					.arg(reply->property("duration string").toString())
-			);
-			QVariantMap counts = obj["counts"].toObject().toVariantMap();
-			m_countsChart->plotCounts(counts);
-			m_countsChart->setInterval(metadata["counts_interval_sec"].toInt());
-		}
-		else
-			QMessageBox::warning(this, "Malformed Reply", QString("Could not parse server's reply: %1").arg(parseError.errorString()));
-	}
-	else
-		QMessageBox::warning(this, "Network Error", QString("Network request failed: %1").arg(reply->errorString()));
-
-	setInputsEnabled(true);
-	switch (m_lastInputFocus)
-	{
-		case Query:
-			m_widget->queryInputCombo->setFocus();
-			break;
-		case Timerange:
-			m_widget->timerangeCombo->setFocus();
-			break;
-		case Other:
-			break;
-	}
-}
-
-
-void QStuffMainWindow::setKeys(const QJsonObject& keys)
+void QStuffMainWindow::setKeys(const QVariantMap& keys)
 {
 	auto rootItem = m_keysModel->invisibleRootItem();
 	QStringList expandedKeys;
@@ -311,10 +232,9 @@ void QStuffMainWindow::setKeys(const QJsonObject& keys)
 
 	rootItem->removeRows(0, rootItem->rowCount());
 
-	auto keymap = keys.toVariantMap();
-	auto end = keymap.end();
+	auto end = keys.end();
 	int row = 0;
-	for (auto it=keymap.begin(); it!=end; ++it, ++row)
+	for (auto it=keys.begin(); it!=end; ++it, ++row)
 	{
 		QStandardItem* item = new QStandardItem(it.key());
 		item->setData(it.key(), Qt::UserRole);
@@ -587,40 +507,59 @@ void QStuffMainWindow::saveView()
 
 void QStuffMainWindow::setInputsEnabled(bool enabled)
 {
+	if (!enabled)
+	{
+		if (focusWidget() == m_widget->timerangeCombo)
+			m_lastInputFocus = Timerange;
+		else if (focusWidget() == m_widget->queryInputCombo)
+			m_lastInputFocus = Query;
+		else
+			m_lastInputFocus = Other;
+	}
+
 	m_widget->queryInputCombo->setEnabled(enabled);
 	m_widget->timerangeCombo->setEnabled(enabled);
+
+	if (enabled)
+	{
+		switch (m_lastInputFocus)
+		{
+			case Query:
+				m_widget->queryInputCombo->setFocus();
+				break;
+			case Timerange:
+				m_widget->timerangeCombo->setFocus();
+				break;
+			case Other:
+				break;
+		}
+	}
 }
 
 
 void QStuffMainWindow::showSettingsDialog()
 {
+	StuffstreamClient* client = StuffstreamClient::get();
 	SettingsDialog dlg(this);
-	QSettings settings;
-	dlg.setStuffstreamUrl(m_searchUrl);
-	dlg.setMaxEvents(m_searchMaxEvents);
-	dlg.setTrustedCerts(settings.value("ca_certificate", "").toString());
+	dlg.setStuffstreamUrl(client->baseUrl());
+	dlg.setMaxEvents(client->maxEvents());
+	dlg.setTrustedCerts(client->trustedCertificates());
 
 	if (dlg.exec() == QDialog::Accepted)
 	{
-		m_searchUrl = dlg.stuffstreamUrl();
-		m_searchMaxEvents = dlg.maxEvents();
-		setCaCertificate(dlg.trustedCerts());
-		settings.setValue("stuffstream_url", m_searchUrl);
-		settings.setValue("max_events", m_searchMaxEvents);
-		settings.setValue("ca_certificate", dlg.trustedCerts());
+		QString searchUrl = dlg.stuffstreamUrl();
+		quint64 maxEvents = dlg.maxEvents();
+		QString trustedCerts = dlg.trustedCerts();
+
+		QSettings settings;
+		settings.setValue("stuffstream_url", searchUrl);
+		settings.setValue("max_events", maxEvents);
+		settings.setValue("ca_certificate", trustedCerts);
+
+		client->setBaseUrl(searchUrl);
+		client->setMaxEvents(maxEvents);
+		client->setTrustedCertificates(trustedCerts);
 		search();
-	}
-}
-
-
-void QStuffMainWindow::setCaCertificate(const QString& filename)
-{
-	delete m_sslConfiguration;
-	m_sslConfiguration = nullptr;
-	if (! filename.isEmpty())
-	{
-		m_sslConfiguration = new QSslConfiguration(QSslConfiguration::defaultConfiguration());
-		m_sslConfiguration->addCaCertificates(QSslCertificate::fromPath(filename));
 	}
 }
 
@@ -680,8 +619,9 @@ void QStuffMainWindow::setupFilterView()
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
 		if (! selected.isEmpty())
 		{
-			for (auto index : qAsConst(selected))
-				changed |= m_filterModel->invertFilter(index);
+			changed = std::any_of(selected.constBegin(), selected.constEnd(), [this](QModelIndex index) {
+				return m_filterModel->invertFilter(index);
+			});
 		}
 		if (changed)
 			search();
@@ -713,15 +653,15 @@ void QStuffMainWindow::setupFilterView()
 
 void QStuffMainWindow::setupChartView()
 {
-	m_countsChart = new CountsChart(this);
-	m_widget->countGraph->setChart(m_countsChart->chart());
-	m_widget->countGraph->setRenderHint(QPainter::Antialiasing);
-	m_widget->countGraph->setRubberBand(QChartView::HorizontalRubberBand)
-;
-	connect(m_countsChart->xAxis(), &QDateTimeAxis::rangeChanged, this, [this](QDateTime min, QDateTime max){
+	m_chartWidget = new ChartWidget(this);
+	m_widget->chartDock->setWidget(m_chartWidget);
+
+	connect(m_chartWidget, &ChartWidget::timerangeSelected, this, [this](QDateTime min, QDateTime max){
 		int index = m_timerangeModel->addChoice(TimeSpec(min), TimeSpec(max));
 		m_widget->timerangeCombo->setCurrentIndex(index);
 	});
+
+	connect(this, &QStuffMainWindow::startSearch, m_chartWidget, &ChartWidget::fetchCounts);
 
 	QAction* toggleChart = m_widget->chartDock->toggleViewAction();
 	toggleChart->setText("Show &Chart");

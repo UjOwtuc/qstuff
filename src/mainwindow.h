@@ -6,19 +6,19 @@
 namespace Ui {
 	class QStuffMainWindow;
 }
-class QNetworkAccessManager;
 class QNetworkReply;
 class QStandardItemModel;
 class QItemSelection;
 class LogModel;
 class TimerangeModel;
 class QSortFilterProxyModel;
-class CountsChart;
 class FilterModel;
 class QSslConfiguration;
+class ChartWidget;
 
 class QStuffMainWindow : public QMainWindow
 {
+	Q_OBJECT
 public:
 	enum LastInputFocus { Query, Timerange, Other };
 	QStuffMainWindow();
@@ -33,13 +33,14 @@ public slots:
 	void saveView();
 	void setInputsEnabled(bool enabled);
 	void showSettingsDialog();
-	void setCaCertificate(const QString& filename);
 
 protected slots:
-	void requestFinished(QNetworkReply* reply);
+	void setKeys(const QVariantMap& keys);
+
+signals:
+	void startSearch(const QDateTime& start, const QDateTime& end, const QString& query);
 
 protected:
-	void setKeys(const QJsonObject& keys);
 	void closeEvent(QCloseEvent* event) override;
 	void saveQueryHistory();
 	void loadQueryHistory();
@@ -48,18 +49,13 @@ protected:
 
 private:
 	Ui::QStuffMainWindow* m_widget;
-	QNetworkAccessManager* m_netAccess;
 	QStandardItemModel* m_keysModel;
 	LogModel* m_logModel;
 	TimerangeModel* m_timerangeModel;
 	LastInputFocus m_lastInputFocus;
 	QSortFilterProxyModel* m_keysProxy;
-	CountsChart* m_countsChart;
 	FilterModel* m_filterModel;
-
-	QString m_searchUrl;
-	quint64 m_searchMaxEvents;
-	QSslConfiguration *m_sslConfiguration;
+	ChartWidget* m_chartWidget;
 
 	void setupKeysView();
 	void setupFilterView();

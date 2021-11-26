@@ -7,6 +7,7 @@ class QueryValidator : public QValidator
 {
 	Q_OBJECT
 	Q_PROPERTY(ParseRule rule MEMBER m_rule WRITE setRule USER true);
+	Q_PROPERTY(bool acceptEmpty MEMBER m_acceptEmpty WRITE setAcceptEmpty);
 
 public:
 	enum ParseRule {
@@ -21,9 +22,11 @@ public:
 	void fixup(QString& input) const override;
 
 	void setRule(ParseRule rule) { m_rule = rule; }
+	void setAcceptEmpty(bool accept) { m_acceptEmpty = accept; }
 
 private:
 	ParseRule m_rule;
+	bool m_acceptEmpty;
 };
 Q_DECLARE_METATYPE(QueryValidator::ParseRule);
 

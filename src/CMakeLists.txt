@@ -6,12 +6,13 @@ set(qstuff_SRCS
 	timerangemodel.cpp
 	saveviewdialog.cpp
 	keyfilterproxymodel.cpp
-	countschart.cpp
 	filtermodel.cpp
 	filterdelegate.cpp
 	editfilterwidget.cpp
 	queryvalidator.cpp
 	settingsdialog.cpp
+	chartwidget.cpp
+	stuffstreamclient.cpp
 )
 set(qstuff_LIBS
 	Qt5::Gui Qt5::Widgets Qt5::Network Qt5::Charts
