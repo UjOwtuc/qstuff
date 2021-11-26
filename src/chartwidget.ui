@@ -14,13 +14,6 @@
    <string>Chart</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0">
-    <widget class="QLabel" name="splitLabel">
-     <property name="text">
-      <string>Split By:</string>
-     </property>
-    </widget>
-   </item>
    <item row="0" column="1">
     <widget class="QComboBox" name="splitCombo">
      <property name="sizePolicy">
@@ -34,7 +27,31 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0" rowspan="2" colspan="2">
+   <item row="0" column="2">
+    <widget class="QLabel" name="limitBucketsLabel">
+     <property name="text">
+      <string>Limit Buckets:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="splitLabel">
+     <property name="text">
+      <string>Split By:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="3">
+    <widget class="QSpinBox" name="limitBucketsSpinbox">
+     <property name="maximum">
+      <number>99999</number>
+     </property>
+     <property name="value">
+      <number>5</number>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" rowspan="2" colspan="4">
     <widget class="QChartView" name="chartView">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Ignored">

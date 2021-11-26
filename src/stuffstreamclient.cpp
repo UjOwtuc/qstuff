@@ -45,7 +45,9 @@ QUrlQuery StuffstreamClient::buildQueryParams(const QDateTime& start, const QDat
 	QUrlQuery queryItems;
 	queryItems.addQueryItem("start", start.toUTC().toString(Qt::ISODate));
 	queryItems.addQueryItem("end", end.toUTC().toString(Qt::ISODate));
-	queryItems.addQueryItem("query", query);
+
+	if (! query.isEmpty())
+		queryItems.addQueryItem("query", query);
 	return queryItems;
 }
 
@@ -62,10 +64,14 @@ QNetworkReply* StuffstreamClient::fetchEvents(const QDateTime& start, const QDat
 }
 
 
-QNetworkReply* StuffstreamClient::fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query, const QString& splitBy)
+QNetworkReply* StuffstreamClient::fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query, const QString& splitBy, quint32 limitBuckets)
 {
 	QUrlQuery queryItems = buildQueryParams(start, end, query);
-	queryItems.addQueryItem("split_by", splitBy);
+	if (! splitBy.isEmpty())
+		queryItems.addQueryItem("split_by", splitBy);
+	if (limitBuckets > 0)
+		queryItems.addQueryItem("max_buckets", QString::number(limitBuckets));
+
 	QUrl url(m_baseUrl);
 	url.setPath("/counts");
 	url.setQuery(queryItems);

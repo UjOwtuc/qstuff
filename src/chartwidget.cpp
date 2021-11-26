@@ -82,6 +82,7 @@ ChartWidget::ChartWidget(QWidget* parent)
 	connect(StuffstreamClient::get(), &StuffstreamClient::receivedCounts, this, &ChartWidget::update);
 	connect(m_widget->splitCombo->lineEdit(), &QLineEdit::editingFinished, this, &ChartWidget::fetchIfSplitValueChanged);
 	connect(m_widget->splitCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChartWidget::fetchIfSplitValueChanged);
+	connect(m_widget->limitBucketsSpinbox, &QSpinBox::editingFinished, this, &ChartWidget::fetchIfSplitValueChanged);
 }
 
 
@@ -186,12 +187,22 @@ void ChartWidget::update(const QVariantMap& points)
 
 void ChartWidget::fetchIfSplitValueChanged()
 {
+	bool changed = false;
 	if (m_widget->splitCombo->currentText() != m_currentSplitValue)
 	{
 		m_currentSplitValue = m_widget->splitCombo->currentText();
 		emit splitByChanged(m_currentSplitValue);
-		sendFetchRequest();
+		changed = true;
 	}
+	if (m_widget->limitBucketsSpinbox->value() != m_currentBucketsLimit)
+	{
+		m_currentBucketsLimit = m_widget->limitBucketsSpinbox->value();
+		emit limitBucketsChanged(m_currentBucketsLimit);
+		changed = true;
+	}
+
+	if (changed)
+		sendFetchRequest();
 }
 
 
@@ -208,12 +219,25 @@ void ChartWidget::setSplitBy(const QString& value)
 }
 
 
+quint32 ChartWidget::limitBuckets() const
+{
+	return m_widget->limitBucketsSpinbox->value();
+}
+
+
+void ChartWidget::setLimitBuckets(quint32 value)
+{
+	m_widget->limitBucketsSpinbox->setValue(value);
+	fetchIfSplitValueChanged();
+}
+
+
 void ChartWidget::sendFetchRequest()
 {
 	if (m_lastQueryStart.isValid() && m_lastQueryEnd.isValid())
 	{
 		StuffstreamClient* client = StuffstreamClient::get();
-		client->fetchCounts(m_lastQueryStart, m_lastQueryEnd, m_lastQueryString, m_widget->splitCombo->currentText());
+		client->fetchCounts(m_lastQueryStart, m_lastQueryEnd, m_lastQueryString, m_widget->splitCombo->currentText(), m_widget->limitBucketsSpinbox->value());
 		m_forceRefresh = false;
 	}
 }
