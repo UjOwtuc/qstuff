@@ -24,7 +24,7 @@ QString prettyInterval(quint64 seconds)
 			break;
 		case 61 ... 3599:
 			if (seconds % 60)
-				pretty = QString("%1:%2 minutes").arg(int(seconds / 60)).arg(seconds % 60, 2, QChar('0'));
+				pretty = QString("%1:%2 minutes").arg(int(seconds / 60)).arg(seconds % 60, 2, 10, QChar('0'));
 			else
 				pretty = QString("%1 minutes").arg(int(seconds / 60));
 			break;
@@ -35,7 +35,7 @@ QString prettyInterval(quint64 seconds)
 		{
 			int minutes = seconds / 60;
 			if (minutes % 60)
-				pretty = QString("%1:%2 hours").arg(int(minutes / 60)).arg(minutes % 60, 2, QChar('0'));
+				pretty = QString("%1:%2 hours").arg(int(minutes / 60)).arg(minutes % 60, 2, 10, QLatin1Char('0'));
 			else
 				pretty = QString("%1 hours").arg(int(minutes / 60));
 			break;
