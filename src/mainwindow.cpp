@@ -639,6 +639,10 @@ void QStuffMainWindow::setupFilterView()
 		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
 		if (! selected.isEmpty())
 		{
+			// sort by row descending, so removing by row numer works
+			std::sort(selected.begin(), selected.end(), [](QModelIndex a, QModelIndex b) {
+				return a.row() > b.row();
+			});
 			QSignalBlocker blocker(m_filterModel);
 			for (auto index : qAsConst(selected))
 				m_filterModel->removeRow(index.row());
