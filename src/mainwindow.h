@@ -46,6 +46,7 @@ protected:
 	void loadQueryHistory();
 	void loadTimerangeChoices();
 	void saveFilters();
+	QAction* createLoadViewAction(const QString& viewName);
 
 private:
 	Ui::QStuffMainWindow* m_widget;

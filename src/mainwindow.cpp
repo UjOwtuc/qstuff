@@ -125,15 +125,17 @@ QStuffMainWindow::QStuffMainWindow()
 		m_widget->logsTable->resizeColumnsToContents();
 	});
 
+	QString defaultView = settings.value("default_view", "default").toString();
 	settings.beginGroup("views");
 	const QStringList& viewNames = settings.childGroups();
 	for (const QString& name : qAsConst(viewNames))
 	{
-		QAction* loadViewAction = new QAction(name, this);
-		connect(loadViewAction, &QAction::triggered, this, [this,name]{
-			loadView(name);
-		});
-		m_widget->menu_view->addAction(loadViewAction);
+		QAction* loadViewAction = createLoadViewAction(name);
+		if (name == defaultView)
+		{
+			qDebug() << "default view" << defaultView << "exists, loading it on startup";
+			QTimer::singleShot(0, loadViewAction, &QAction::trigger);
+		}
 	}
 	settings.endGroup();
 
@@ -335,6 +337,26 @@ void QStuffMainWindow::saveFilters()
 }
 
 
+QAction* QStuffMainWindow::createLoadViewAction (const QString& viewName)
+{
+	const QString data = QString("view %1").arg(viewName);
+	QList<QAction*> actions = m_widget->menu_view->actions();
+	for (QAction* a : qAsConst(actions))
+	{
+		if (a->data() == data)
+			return a;
+	}
+
+	QAction* loadViewAction = new QAction(viewName, this);
+	loadViewAction->setData(data);
+	connect(loadViewAction, &QAction::triggered, this, [this,viewName]{
+		loadView(viewName);
+	});
+	m_widget->menu_view->addAction(loadViewAction);
+	return loadViewAction;
+}
+
+
 void QStuffMainWindow::currentLogItemChanged(const QItemSelection& selected, const QItemSelection& /* deselected */)
 {
 	m_widget->detailsTable->clearContents();
@@ -522,6 +544,8 @@ void QStuffMainWindow::saveView()
 		}
 		settings.setValue("split_by", splitBy);
 		settings.setValue("limit_buckets", limitBuckets);
+
+		createLoadViewAction(dlg.name());
 	}
 }
 
