@@ -244,10 +244,11 @@ QString ChartWidget::splitBy() const
 }
 
 
-void ChartWidget::setSplitBy(const QString& value)
+void ChartWidget::setSplitBy(const QString& value, bool preventRefresh)
 {
 	m_widget->splitCombo->setCurrentText(value);
-	fetchIfSplitValueChanged();
+	if (! preventRefresh)
+		fetchIfSplitValueChanged();
 }
 
 
@@ -257,10 +258,11 @@ quint32 ChartWidget::limitBuckets() const
 }
 
 
-void ChartWidget::setLimitBuckets(quint32 value)
+void ChartWidget::setLimitBuckets(quint32 value, bool preventRefresh)
 {
 	m_widget->limitBucketsSpinbox->setValue(value);
-	fetchIfSplitValueChanged();
+	if (! preventRefresh)
+		fetchIfSplitValueChanged();
 }
 
 

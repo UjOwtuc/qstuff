@@ -35,8 +35,8 @@ public slots:
 	void fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query);
 	void update(const QVariantMap& points);
 	void fetchIfSplitValueChanged();
-	void setSplitBy(const QString& value);
-	void setLimitBuckets(quint32 value);
+	void setSplitBy(const QString& value, bool preventRefresh=false);
+	void setLimitBuckets(quint32 value, bool preventRefresh=false);
 	void setScaleToInterval(quint64 value);
 
 protected slots:

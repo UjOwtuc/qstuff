@@ -21,34 +21,7 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
-    <widget class="QCheckBox" name="saveQueryCheckbox">
-     <property name="text">
-      <string>Remember Query String</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
    <item row="5" column="0" colspan="2">
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="1">
-    <widget class="QCheckBox" name="saveTimerangeCheckbox">
-     <property name="text">
-      <string>Remember Timerange</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="0" colspan="2">
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
@@ -61,6 +34,13 @@
      </property>
     </spacer>
    </item>
+   <item row="3" column="1">
+    <widget class="QCheckBox" name="saveTimerangeCheckbox">
+     <property name="text">
+      <string>Remember Timerange</string>
+     </property>
+    </widget>
+   </item>
    <item row="0" column="1">
     <widget class="QLineEdit" name="nameEdit">
      <property name="text">
@@ -72,6 +52,36 @@
     <widget class="QCheckBox" name="saveFiltersCheckbox">
      <property name="text">
       <string>Remember Filters</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QCheckBox" name="saveQueryCheckbox">
+     <property name="text">
+      <string>Remember Query String</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0" colspan="2">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QCheckBox" name="saveSplitCheckbox">
+     <property name="text">
+      <string>Remember Chart Splitting</string>
      </property>
      <property name="checked">
       <bool>true</bool>

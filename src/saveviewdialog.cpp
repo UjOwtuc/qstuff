@@ -32,3 +32,9 @@ bool SaveViewDialog::saveFilters() const
 {
 	return m_widget->saveFiltersCheckbox->isChecked();
 }
+
+
+bool SaveViewDialog::saveSplit() const
+{
+	return m_widget->saveSplitCheckbox->isChecked();
+}

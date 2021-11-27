@@ -15,6 +15,7 @@ public:
 	bool saveQuery() const;
 	bool saveTimerange() const;
 	bool saveFilters() const;
+	bool saveSplit() const;
 
 private:
 	Ui::SaveViewDialog* m_widget;

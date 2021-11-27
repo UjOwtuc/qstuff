@@ -75,12 +75,12 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 	m_widget->scaleIntervalCombo->addItem("1 hour", 3600);
 	m_widget->scaleIntervalCombo->addItem("Custom");
 
-	connect(m_widget->scaleIntervalCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this]{
+	connect(m_widget->scaleIntervalCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]{
 		QVariant data = m_widget->scaleIntervalCombo->currentData();
 		if (! data.isNull())
 			m_widget->scaleIntervalCustomSpinbox->setValue(data.toInt());
 	});
-	connect(m_widget->scaleIntervalCustomSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value){
+	connect(m_widget->scaleIntervalCustomSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int value){
 		int index = m_widget->scaleIntervalCombo->findData(value);
 		if (index == -1)
 			index = m_widget->scaleIntervalCombo->findData(QVariant());

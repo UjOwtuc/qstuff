@@ -470,6 +470,13 @@ void QStuffMainWindow::loadView(const QString& name)
 	for (const FilterExpression& filter : qAsConst(filters))
 		m_filterModel->addFilter(filter);
 
+	QVariant splitBy = settings.value("split_by");
+	if (! splitBy.isNull())
+		m_chartWidget->setSplitBy(splitBy.toString(), true);
+	QVariant limitBuckets = settings.value("limit_buckets");
+	if (! limitBuckets.isNull())
+		m_chartWidget->setLimitBuckets(limitBuckets.toUInt(), true);
+
 	search();
 }
 
@@ -506,6 +513,15 @@ void QStuffMainWindow::saveView()
 		}
 		settings.setValue("start", start);
 		settings.setValue("end", end);
+
+		QVariant splitBy, limitBuckets;
+		if (dlg.saveSplit())
+		{
+			splitBy = m_chartWidget->splitBy();
+			limitBuckets = m_chartWidget->limitBuckets();
+		}
+		settings.setValue("split_by", splitBy);
+		settings.setValue("limit_buckets", limitBuckets);
 	}
 }
 
