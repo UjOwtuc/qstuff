@@ -42,11 +42,6 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 	completer->setModel(new FileSystemModel(completer));
 	m_widget->trustedCertsEdit->setCompleter(completer);
 
-	m_widget->scaleIntervalCombo->addItem("Don't scale", 0);
-	m_widget->scaleIntervalCombo->addItem("1 second", 1);
-	m_widget->scaleIntervalCombo->addItem("1 minute", 60);
-	m_widget->scaleIntervalCombo->addItem("1 hour", 3600);
-
 	connect(m_widget->trustedCertsEdit, &QLineEdit::textChanged, this, [this, completer](const QString& text){
 		QFileInfo file(text);
 		if (file.exists() && file.isDir())
@@ -73,6 +68,27 @@ SettingsDialog::SettingsDialog(QWidget* parent, Qt::WindowFlags f)
 	});
 
 	connect(m_widget->maxEventsSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), this, &SettingsDialog::maxEventsChanged);
+
+	m_widget->scaleIntervalCombo->addItem("Don't scale", 0);
+	m_widget->scaleIntervalCombo->addItem("1 second", 1);
+	m_widget->scaleIntervalCombo->addItem("1 minute", 60);
+	m_widget->scaleIntervalCombo->addItem("1 hour", 3600);
+	m_widget->scaleIntervalCombo->addItem("Custom");
+
+	connect(m_widget->scaleIntervalCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this]{
+		QVariant data = m_widget->scaleIntervalCombo->currentData();
+		if (! data.isNull())
+			m_widget->scaleIntervalCustomSpinbox->setValue(data.toInt());
+	});
+	connect(m_widget->scaleIntervalCustomSpinbox, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value){
+		int index = m_widget->scaleIntervalCombo->findData(value);
+		if (index == -1)
+			index = m_widget->scaleIntervalCombo->findData(QVariant());
+
+		emit scaleIntervalChanged(value);
+		QSignalBlocker blocker(m_widget->scaleIntervalCombo);
+		m_widget->scaleIntervalCombo->setCurrentIndex(index);
+	});
 }
 
 
@@ -114,17 +130,11 @@ void SettingsDialog::setTrustedCerts(const QString& value)
 
 quint64 SettingsDialog::scaleInterval() const
 {
-	return m_widget->scaleIntervalCombo->currentData().toULongLong();
+	return m_widget->scaleIntervalCustomSpinbox->value();
 }
 
 
 void SettingsDialog::setScaleInterval(quint64 value)
 {
-	int index = m_widget->scaleIntervalCombo->findData(value);
-	if (! index)
-	{
-		m_widget->scaleIntervalCombo->addItem(QString("%1 seconds").arg(value), value);
-		index = m_widget->scaleIntervalCombo->findData(value);
-	}
-	m_widget->scaleIntervalCombo->setCurrentIndex(index);
+	m_widget->scaleIntervalCustomSpinbox->setValue(value);
 }

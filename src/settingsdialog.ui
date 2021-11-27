@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QGroupBox" name="groupBox">
+    <widget class="QGroupBox" name="networkGroup">
      <property name="title">
       <string>Network</string>
      </property>
@@ -87,7 +87,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBox_2">
+    <widget class="QGroupBox" name="chartGroup">
      <property name="title">
       <string>Chart</string>
      </property>
@@ -100,11 +100,21 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QComboBox" name="scaleIntervalCombo">
-        <property name="editable">
-         <bool>true</bool>
-        </property>
-       </widget>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QComboBox" name="scaleIntervalCombo"/>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="scaleIntervalCustomSpinbox">
+          <property name="suffix">
+           <string> seconds</string>
+          </property>
+          <property name="maximum">
+           <number>99999</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>
