@@ -586,7 +586,8 @@ void QStuffMainWindow::setupChartView()
 
 	connect(m_chartWidget, &ChartWidget::lineClicked, this, [this](const QString& value){
 		m_filterListWidget->addFilter(FilterExpression(m_chartWidget->splitBy(), FilterExpression::Eq, QString("\"%1\"").arg(value), false));
-		m_chartWidget->setSplitBy("");
+		m_chartWidget->setSplitBy("", true);
+		search();
 	});
 
 	QAction* toggleChart = m_widget->chartDock->toggleViewAction();
