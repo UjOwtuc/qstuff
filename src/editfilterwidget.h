@@ -1,34 +1,16 @@
 #ifndef EDITFILTERWIDGET_H
 #define EDITFILTERWIDGET_H
 
+#include "filterexpression.h"
+
 #include <QWidget>
-#include <QLineEdit>
-#include "filtermodel.h"
 
 namespace Ui {
 	class EditFilterWidget;
 }
 class QStringListModel;
 class QueryValidator;
-
-class SyntaxCheckedLineedit : public QLineEdit
-{
-	Q_OBJECT
-	Q_PROPERTY(QColor okColor MEMBER m_okColor USER true);
-	Q_PROPERTY(QColor problemColor MEMBER m_problemColor USER true);
-	Q_PROPERTY(QPalette::ColorRole colorRole MEMBER m_colorRole USER true);
-public:
-	explicit SyntaxCheckedLineedit(QWidget* parent = nullptr);
-
-public slots:
-	void checkContent();
-
-private:
-	QPalette::ColorRole m_colorRole;
-	QColor m_okColor;
-	QColor m_problemColor;
-};
-
+class QAbstractItemModel;
 
 class EditFilterWidget : public QWidget
 {

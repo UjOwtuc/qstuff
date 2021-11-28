@@ -6,14 +6,11 @@
 namespace Ui {
 	class QStuffMainWindow;
 }
-class QNetworkReply;
 class QStandardItemModel;
 class QItemSelection;
 class LogModel;
 class TimerangeModel;
 class QSortFilterProxyModel;
-class FilterModel;
-class QSslConfiguration;
 class ChartWidget;
 class FilterListWidget;
 

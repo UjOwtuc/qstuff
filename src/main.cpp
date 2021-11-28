@@ -1,5 +1,4 @@
 #include <QApplication>
-#include <QItemEditorFactory>
 
 #include "mainwindow.h"
 
@@ -14,4 +13,3 @@ int main(int argc, char *argv[])
 
 	return app.exec();
 }
-

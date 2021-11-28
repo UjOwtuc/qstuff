@@ -1,6 +1,6 @@
 #include "filterdelegate.h"
-#include "filtermodel.h"
 #include "editfilterwidget.h"
+#include "filterexpression.h"
 
 #include <QApplication>
 #include <QDebug>

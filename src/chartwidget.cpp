@@ -1,7 +1,7 @@
 #include "chartwidget.h"
-#include "editfilterwidget.h"
 #include "queryvalidator.h"
 #include "stuffstreamclient.h"
+#include "syntaxcheckedlineedit.h"
 
 #include <QDebug>
 

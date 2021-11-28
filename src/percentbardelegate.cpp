@@ -1,7 +1,6 @@
 #include "percentbardelegate.h"
 
 #include <QApplication>
-#include <QDebug>
 
 
 PercentBarDelegate::PercentBarDelegate(int max, QObject* parent)

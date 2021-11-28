@@ -5,19 +5,15 @@
 #include "timerangemodel.h"
 #include "saveviewdialog.h"
 #include "keyfilterproxymodel.h"
-#include "filtermodel.h"
-#include "filterdelegate.h"
 #include "queryvalidator.h"
-#include "editfilterwidget.h"
 #include "settingsdialog.h"
 #include "chartwidget.h"
 #include "stuffstreamclient.h"
 #include "manageviewsdialog.h"
 #include "savedviewsmodel.h"
 #include "filterlistwidget.h"
+#include "syntaxcheckedlineedit.h"
 
-#include <QLineEdit>
-#include <QUrlQuery>
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -25,12 +21,8 @@
 #include <QStandardItemModel>
 #include <QTimer>
 #include <QSettings>
-#include <QSortFilterProxyModel>
 #include <QProgressBar>
 #include <QMessageBox>
-
-#include <QtCharts/QDateTimeAxis>
-#include <QtCharts/QChart>
 
 #include "ui_mainwindow.h"
 

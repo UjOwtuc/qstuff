@@ -19,6 +19,7 @@ set(qstuff_SRCS
 	filterexpression.cpp
 	savedview.cpp
 	filterlistwidget.cpp
+	syntaxcheckedlineedit.cpp
 )
 set(qstuff_LIBS
 	Qt5::Gui Qt5::Widgets Qt5::Network Qt5::Charts
