@@ -16,10 +16,14 @@ set(qstuff_SRCS
 	savedviewsmodel.cpp
 	manageviewsdialog.cpp
 	timespec.cpp
+	filterexpression.cpp
+	savedview.cpp
+	filterlistwidget.cpp
 )
 set(qstuff_LIBS
 	Qt5::Gui Qt5::Widgets Qt5::Network Qt5::Charts
 )
+set(CMAKE_INCLUDE_CURRENT_DIR On)
 
 if(EXISTS ${logstuff_query})
 	add_definitions(-DWITH_LOGSTUFF_QUERY)

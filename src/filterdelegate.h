@@ -6,7 +6,7 @@
 class FilterDelegate : public QStyledItemDelegate
 {
 public:
-	explicit FilterDelegate(QAbstractItemModel* editorCompletionsModel, QObject* parent = nullptr);
+	explicit FilterDelegate(QAbstractItemModel* editorCompletionsModel = nullptr, QObject* parent = nullptr);
 
 	void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const;
 	QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const;

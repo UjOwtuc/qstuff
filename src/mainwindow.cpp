@@ -14,6 +14,7 @@
 #include "stuffstreamclient.h"
 #include "manageviewsdialog.h"
 #include "savedviewsmodel.h"
+#include "filterlistwidget.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -85,6 +86,7 @@ QStuffMainWindow::QStuffMainWindow()
 	QString defaultView = settings.value("default_view", "default").toString();
 	settings.beginGroup("views");
 	const QStringList& viewNames = settings.childGroups();
+	bool defaultViewExists = false;
 	for (const QString& name : qAsConst(viewNames))
 	{
 		QAction* loadViewAction = createLoadViewAction(name);
@@ -92,11 +94,11 @@ QStuffMainWindow::QStuffMainWindow()
 		{
 			qDebug() << "default view" << defaultView << "exists, loading it on startup";
 			QTimer::singleShot(0, loadViewAction, &QAction::trigger);
+			defaultViewExists = true;
 		}
 	}
 	settings.endGroup();
 
-	loadTimerangeChoices();
 	loadQueryHistory();
 
 	connect(m_widget->action_Settings, &QAction::triggered, this, &QStuffMainWindow::showSettingsDialog);
@@ -128,7 +130,8 @@ QStuffMainWindow::QStuffMainWindow()
 		QMessageBox::warning(this, "Request failed", msg);
 	});
 
-	QTimer::singleShot(0, this, &QStuffMainWindow::search);
+	if (! defaultViewExists)
+		QTimer::singleShot(0, this, &QStuffMainWindow::search);
 }
 
 
@@ -144,7 +147,7 @@ void QStuffMainWindow::search()
 		setInputsEnabled(false);
 		m_widget->statusbar->clearMessage();
 
-		QString query = m_filterModel->enabledExpressions().join(" and ");
+		QString query = m_filterListWidget->combinedFilterString();
 		QString input = m_widget->queryInputCombo->currentText();
 		if (! input.isEmpty())
 		{
@@ -222,7 +225,7 @@ void QStuffMainWindow::setKeys(const QVariantMap& keys)
 void QStuffMainWindow::closeEvent(QCloseEvent* event)
 {
 	saveQueryHistory();
-	saveFilters();
+	m_filterListWidget->saveFilters();
 	QSettings settings;
 	settings.setValue("mainwindow/geometry", saveGeometry());
 	settings.setValue("mainwindow/windowState", saveState());
@@ -254,43 +257,6 @@ void QStuffMainWindow::loadQueryHistory()
 		m_widget->queryInputCombo->addItem(settings.value("query").toString());
 	}
 	settings.endArray();
-}
-
-
-void QStuffMainWindow::loadTimerangeChoices()
-{
-	QSignalBlocker blocker(m_widget->timerangeCombo);
-	QSettings settings;
-	int size = settings.beginReadArray("timerange_choices");
-	for (int i=0; i<size; ++i)
-	{
-		settings.setArrayIndex(i);
-		TimeSpec start = TimeSpec::deserialize(settings.value("start").toStringList());
-		TimeSpec end = TimeSpec::deserialize(settings.value("end").toStringList());
-		m_timerangeModel->addChoice(start, end);
-	}
-	settings.endArray();
-
-	if (size < 1)
-	{
-		m_timerangeModel->addChoice(TimeSpec(15, TimeSpec::Minutes), TimeSpec());
-		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Hours), TimeSpec());
-		m_timerangeModel->addChoice(TimeSpec(4, TimeSpec::Hours), TimeSpec());
-		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Days), TimeSpec());
-		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Weeks), TimeSpec());
-		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Months), TimeSpec());
-		m_timerangeModel->addChoice(TimeSpec(1, TimeSpec::Years), TimeSpec());
-	}
-	m_widget->timerangeCombo->setCurrentIndex(0);
-}
-
-
-void QStuffMainWindow::saveFilters()
-{
-	QSettings settings;
-	QList<FilterExpression> filters = m_filterModel->filters();
-	filters.removeAll(FilterExpression());
-	saveFiltersArray(settings, filters);
 }
 
 
@@ -405,14 +371,14 @@ void QStuffMainWindow::showKeysContextMenu(const QPoint& point)
 			value = QString("\"%1\"").arg(value);
 			QAction* filter = new QAction("Filter for value", contextMenu);
 			connect(filter, &QAction::triggered, this, [this, key, value]{
-				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value, false)) >= 0)
+				if (m_filterListWidget->addFilter(FilterExpression(key, FilterExpression::Eq, value, false)) >= 0)
 					search();
 			});
 			contextMenu->addAction(filter);
 
 			QAction* filterNot = new QAction("Filter out value", contextMenu);
 			connect(filterNot, &QAction::triggered, this, [this, key, value]{
-				if (m_filterModel->addFilter(FilterExpression(key, FilterExpression::Eq, value, true)) >= 0)
+				if (m_filterListWidget->addFilter(FilterExpression(key, FilterExpression::Eq, value, true)) >= 0)
 					search();
 			});
 			contextMenu->addAction(filterNot);
@@ -428,34 +394,32 @@ void QStuffMainWindow::loadView(const QString& name)
 	settings.beginGroup("views");
 	settings.beginGroup(name);
 
+	SavedView view(name);
+	view.load(settings);
+
 	const QSignalBlocker queryBlocker(m_widget->queryInputCombo);
 	const QSignalBlocker timeBlocker(m_widget->timerangeCombo);
 
-	m_widget->queryInputCombo->setCurrentText(settings.value("query").toString());
-	QVariant columns = settings.value("columns");
-	if (! columns.isNull())
-		m_logModel->setColumns(columns.toStringList());
+	if (view.hasQuery())
+		m_widget->queryInputCombo->setCurrentText(view.query());
 
-	QVariant start = settings.value("start");
-	QVariant end = settings.value("end");
-	if (! start.isNull() && ! end.isNull())
+	if (view.hasColumns())
+		m_logModel->setColumns(view.columns());
+
+	if (view.hasTimerange())
 	{
-		int index = m_timerangeModel->addChoice(TimeSpec::deserialize(start.toStringList()), TimeSpec::deserialize(end.toStringList()));
+		int index = m_timerangeModel->addChoice(view.start(), view.end());
 		m_widget->timerangeCombo->setCurrentIndex(index);
 	}
 
-	QList<FilterExpression> filters = loadFiltersArray(settings);
-	m_filterModel->setAllEnabled(false);
-	for (const FilterExpression& filter : qAsConst(filters))
-		m_filterModel->addFilter(filter);
+	if (view.hasFilters())
+		m_filterListWidget->setFilters(view.filters());
 
-	QVariant splitBy = settings.value("split_by");
-	if (! splitBy.isNull())
-		m_chartWidget->setSplitBy(splitBy.toString(), true);
-	QVariant limitBuckets = settings.value("limit_buckets");
-	if (! limitBuckets.isNull())
-		m_chartWidget->setLimitBuckets(limitBuckets.toUInt(), true);
-
+	if (view.hasSplitBy())
+	{
+		m_chartWidget->setSplitBy(view.splitBy());
+		m_chartWidget->setLimitBuckets(view.limitBuckets());
+	}
 	search();
 }
 
@@ -463,6 +427,26 @@ void QStuffMainWindow::loadView(const QString& name)
 void QStuffMainWindow::saveView()
 {
 	SaveViewDialog dlg(this);
+
+	QString query = m_widget->queryInputCombo->currentText();
+	if (query.isEmpty())
+		dlg.setSaveQuery(false);
+	else
+		dlg.setQuery(query);
+
+	dlg.setColumns(m_logModel->columns());
+	dlg.setFilters(m_filterListWidget->filters());
+
+	auto pair = m_widget->timerangeCombo->currentData(Qt::UserRole).value<QPair<TimeSpec, TimeSpec>>();
+	dlg.setTimerange(pair.first, pair.second);
+
+	dlg.setLimitBuckets(m_chartWidget->limitBuckets());
+	QString splitBy = m_chartWidget->splitBy();
+	if (splitBy.isEmpty())
+		dlg.setSaveSplitBy(false);
+	else
+		dlg.setSplitBy(splitBy);
+
 	if (dlg.exec() == QDialog::Accepted)
 	{
 		QSettings settings;
@@ -470,38 +454,8 @@ void QStuffMainWindow::saveView()
 		settings.beginGroup(dlg.name());
 		settings.setValue("columns", m_logModel->columns());
 
-		QVariant query;
-		if (dlg.saveQuery())
-			query = m_widget->queryInputCombo->currentText();
-		settings.setValue("query", query);
-
-		QList<FilterExpression> filters;
-		if (dlg.saveFilters())
-		{
-			filters = m_filterModel->filters();
-			filters.removeAll(FilterExpression());
-		}
-		saveFiltersArray(settings, filters);
-
-		QVariant start, end;
-		if (dlg.saveTimerange())
-		{
-			auto pair = m_widget->timerangeCombo->currentData(Qt::UserRole).value<QPair<TimeSpec, TimeSpec>>();
-			start = pair.first.serialize();
-			end = pair.second.serialize();
-		}
-		settings.setValue("start", start);
-		settings.setValue("end", end);
-
-		QVariant splitBy, limitBuckets;
-		if (dlg.saveSplit())
-		{
-			splitBy = m_chartWidget->splitBy();
-			limitBuckets = m_chartWidget->limitBuckets();
-		}
-		settings.setValue("split_by", splitBy);
-		settings.setValue("limit_buckets", limitBuckets);
-
+		const SavedView view = dlg.view();
+		view.save(settings);
 		createLoadViewAction(dlg.name());
 	}
 }
@@ -574,7 +528,11 @@ void QStuffMainWindow::manageViews()
 {
 	ManageViewsDialog dlg(this);
 	if (dlg.exec() == QDialog::Accepted)
-		dlg.savedViewsModel()->saveToSettings();
+	{
+		QSettings settings;
+		settings.beginGroup("views");
+		SavedView::saveAll(dlg.savedViewsModel()->views(), settings);
+	}
 }
 
 
@@ -600,72 +558,14 @@ void QStuffMainWindow::setupKeysView()
 
 void QStuffMainWindow::setupFilterView()
 {
-	m_filterModel = new FilterModel(this);
-	m_widget->filterList->setModel(m_filterModel);
-	m_widget->filterList->setItemDelegate(new FilterDelegate(m_keysModel, this));
+	m_filterListWidget = new FilterListWidget(m_keysModel, this);
+	m_widget->filterDock->setWidget(m_filterListWidget);
+	m_filterListWidget->loadFilters();
 
-	QSettings settings;
-	QList<FilterExpression> filters = loadFiltersArray(settings);
-	for (const FilterExpression& filter : qAsConst(filters))
-		m_filterModel->addFilter(filter);
-
-	connect(m_widget->filterList->itemDelegate(), &QAbstractItemDelegate::commitData, this, &QStuffMainWindow::search);
-	connect(m_filterModel, &FilterModel::checkStateChanged, this, &QStuffMainWindow::search);
-	connect(m_widget->addFilterButton, &QToolButton::clicked, this, [this]{
-		int row = m_filterModel->addFilter(FilterExpression());
-		m_widget->filterList->edit(m_filterModel->index(row));
-	});
-	connect(m_widget->enableAllFiltersButton, &QToolButton::clicked, this, [this]{
-		if(m_filterModel->setAllEnabled(true))
-			search();
-	});
-	connect(m_widget->disableAllFiltersButton, &QToolButton::clicked, this, [this]{
-		if (m_filterModel->setAllEnabled(false))
-			search();
-	});
-	connect(m_widget->removeAllFiltersButton, &QToolButton::clicked, this, [this]{
-		if (m_filterModel->removeAllFilters())
-			search();
-	});
-
-	connect(m_widget->invertFilterButton, &QToolButton::clicked, this, [this]{
-		bool changed = false;
-		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
-		if (! selected.isEmpty())
-		{
-			changed = std::any_of(selected.constBegin(), selected.constEnd(), [this](QModelIndex index) {
-				return m_filterModel->invertFilter(index);
-			});
-		}
-		if (changed)
-			search();
-	});
-	connect(m_widget->removeFilterButton, &QToolButton::clicked, this, [this]{
-		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
-		if (! selected.isEmpty())
-		{
-			// sort by row descending, so removing by row numer works
-			std::sort(selected.begin(), selected.end(), [](QModelIndex a, QModelIndex b) {
-				return a.row() > b.row();
-			});
-			QSignalBlocker blocker(m_filterModel);
-			for (auto index : qAsConst(selected))
-				m_filterModel->removeRow(index.row());
-			search();
-		}
-	});
-
-	connect(m_widget->filterList->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this]{
-		QModelIndexList selected = m_widget->filterList->selectionModel()->selectedRows();
-		bool enable_buttons = ! selected.isEmpty();
-		m_widget->invertFilterButton->setEnabled(enable_buttons);
-		m_widget->removeFilterButton->setEnabled(enable_buttons);
-	});
-
+	connect(m_filterListWidget, &FilterListWidget::filtersChanged, this, &QStuffMainWindow::search);
 	QAction* toggleFilters = m_widget->filterDock->toggleViewAction();
 	toggleFilters->setText("Show &Filters");
 	m_widget->menu_Window->addAction(toggleFilters);
-
 }
 
 
@@ -685,7 +585,7 @@ void QStuffMainWindow::setupChartView()
 	connect(this, &QStuffMainWindow::startSearch, m_chartWidget, &ChartWidget::fetchCounts);
 
 	connect(m_chartWidget, &ChartWidget::lineClicked, this, [this](const QString& value){
-		m_filterModel->addFilter(FilterExpression(m_chartWidget->splitBy(), FilterExpression::Eq, QString("\"%1\"").arg(value), false));
+		m_filterListWidget->addFilter(FilterExpression(m_chartWidget->splitBy(), FilterExpression::Eq, QString("\"%1\"").arg(value), false));
 		m_chartWidget->setSplitBy("");
 	});
 

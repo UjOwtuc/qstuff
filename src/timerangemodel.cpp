@@ -2,11 +2,34 @@
 #include "timeinputdialog.h"
 
 #include <QApplication>
+#include <QSettings>
 #include <QDebug>
 
 TimerangeModel::TimerangeModel(QObject* parent)
 	: QAbstractListModel(parent)
-{}
+{
+	QSettings settings;
+	int size = settings.beginReadArray("timerange_choices");
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		TimeSpec start = TimeSpec::deserialize(settings.value("start").toStringList());
+		TimeSpec end = TimeSpec::deserialize(settings.value("end").toStringList());
+		addChoice(start, end);
+	}
+	settings.endArray();
+
+	if (size < 1)
+	{
+		addChoice(TimeSpec(15, TimeSpec::Minutes), TimeSpec());
+		addChoice(TimeSpec(1, TimeSpec::Hours), TimeSpec());
+		addChoice(TimeSpec(4, TimeSpec::Hours), TimeSpec());
+		addChoice(TimeSpec(1, TimeSpec::Days), TimeSpec());
+		addChoice(TimeSpec(1, TimeSpec::Weeks), TimeSpec());
+		addChoice(TimeSpec(1, TimeSpec::Months), TimeSpec());
+		addChoice(TimeSpec(1, TimeSpec::Years), TimeSpec());
+	}
+}
 
 
 int TimerangeModel::rowCount(const QModelIndex& parent) const

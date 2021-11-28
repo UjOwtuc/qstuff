@@ -39,7 +39,10 @@ QWidget* FilterDelegate::createEditor(QWidget* parent, const QStyleOptionViewIte
 	editor->setExpression(index.data(Qt::UserRole).value<FilterExpression>());
 	editor->setAutoFillBackground(true);
 	editor->setBackgroundRole(QPalette::Window);
-	editor->setCompletionsModel(m_editorCompletionsModel);
+
+	if (m_editorCompletionsModel)
+		editor->setCompletionsModel(m_editorCompletionsModel);
+
 	return editor;
 }
 

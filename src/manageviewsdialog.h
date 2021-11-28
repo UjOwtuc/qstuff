@@ -16,6 +16,7 @@ public:
 
 public slots:
 	void removeViews();
+	void editView();
 
 private:
 	Ui::ManageViewsDialog* m_widget;

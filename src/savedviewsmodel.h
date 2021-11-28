@@ -1,6 +1,7 @@
 #ifndef SAVEDVIEWSMODEL_H
 #define SAVEDVIEWSMODEL_H
 
+#include "savedview.h"
 #include "timespec.h"
 
 #include <QAbstractTableModel>
@@ -8,24 +9,6 @@
 
 class FilterExpression;
 class TimeSpec;
-
-struct SavedView
-{
-	// required
-	QString name;
-	QStringList columns;
-
-	// optional
-	QVariant query;
-	bool saveFilters;
-	QList<FilterExpression> filters;
-	bool saveTimerange;
-	TimeSpec start;
-	TimeSpec end;
-	QVariant splitBy;
-	QVariant limitBuckets;
-
-};
 
 class SavedViewsModel : public QAbstractTableModel
 {
@@ -37,10 +20,10 @@ public:
 	int rowCount(const QModelIndex& /*parent*/) const override;
 	QVariant data(const QModelIndex& index, int role) const override;
 	bool removeRows(int row, int count, const QModelIndex& /*parent*/) override;
-	Qt::ItemFlags flags(const QModelIndex& index) const override;
-	bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
-	void saveToSettings() const;
+	const QList<SavedView>& views() const { return m_views; }
+	const SavedView& itemAt(const QModelIndex& index) const;
+	void setItem(const QModelIndex& i, const SavedView& view);
 
 private:
 	QList<SavedView> m_views;

@@ -15,6 +15,7 @@ class QSortFilterProxyModel;
 class FilterModel;
 class QSslConfiguration;
 class ChartWidget;
+class FilterListWidget;
 
 class QStuffMainWindow : public QMainWindow
 {
@@ -45,8 +46,6 @@ protected:
 	void closeEvent(QCloseEvent* event) override;
 	void saveQueryHistory();
 	void loadQueryHistory();
-	void loadTimerangeChoices();
-	void saveFilters();
 	QAction* createLoadViewAction(const QString& viewName);
 
 private:
@@ -56,8 +55,8 @@ private:
 	TimerangeModel* m_timerangeModel;
 	LastInputFocus m_lastInputFocus;
 	QSortFilterProxyModel* m_keysProxy;
-	FilterModel* m_filterModel;
 	ChartWidget* m_chartWidget;
+	FilterListWidget* m_filterListWidget;
 
 	void setupKeysView();
 	void setupFilterView();
