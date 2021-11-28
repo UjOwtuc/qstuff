@@ -13,6 +13,9 @@ set(qstuff_SRCS
 	settingsdialog.cpp
 	chartwidget.cpp
 	stuffstreamclient.cpp
+	savedviewsmodel.cpp
+	manageviewsdialog.cpp
+	timespec.cpp
 )
 set(qstuff_LIBS
 	Qt5::Gui Qt5::Widgets Qt5::Network Qt5::Charts

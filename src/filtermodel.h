@@ -3,6 +3,9 @@
 
 #include <QAbstractListModel>
 
+class QSettings;
+
+
 class FilterExpression
 {
 public:
@@ -74,5 +77,9 @@ signals:
 private:
 	QList<FilterExpression> m_filters;
 };
+
+
+void saveFiltersArray(QSettings& settings, const QList<FilterExpression>& filters);
+QList<FilterExpression> loadFiltersArray(QSettings& settings);
 
 #endif // FILTERMODEL_H

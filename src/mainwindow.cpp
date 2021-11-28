@@ -12,6 +12,8 @@
 #include "settingsdialog.h"
 #include "chartwidget.h"
 #include "stuffstreamclient.h"
+#include "manageviewsdialog.h"
+#include "savedviewsmodel.h"
 
 #include <QLineEdit>
 #include <QUrlQuery>
@@ -30,52 +32,6 @@
 #include <QtCharts/QChart>
 
 #include "ui_mainwindow.h"
-
-
-void saveFiltersArray(QSettings& settings, const QList<FilterExpression>& filters)
-{
-	int size = filters.size();
-	settings.beginWriteArray("filters", size);
-	for (int i=0; i<size; ++i)
-	{
-		settings.setArrayIndex(i);
-		const FilterExpression& filter = filters.at(i);
-		settings.setValue("id", filter.id());
-		settings.setValue("op", filter.op());
-		settings.setValue("value", filter.value());
-		if (filter.hasCustomLabel())
-			settings.setValue("label", filter.label());
-		else
-			settings.setValue("label", QString());
-		settings.setValue("inverted", filter.isInverted());
-		settings.setValue("enabled", filter.enabled());
-	}
-	settings.endArray();
-}
-
-
-QList<FilterExpression> loadFiltersArray(QSettings& settings)
-{
-	QList<FilterExpression> filters;
-	int size = settings.beginReadArray("filters");
-	for (int i=0; i<size; ++i)
-	{
-		settings.setArrayIndex(i);
-		QString id = settings.value("id").toString();
-		FilterExpression::Op op = static_cast<FilterExpression::Op>(settings.value("op").toInt());
-		QString value = settings.value("value").toString();
-		QString label = settings.value("label").toString();
-		bool inverted = settings.value("inverted").toBool();
-		bool enabled = settings.value("enabled").toBool();
-
-		FilterExpression expr(id, op, value, inverted);
-		expr.setLabel(label);
-		expr.setEnabled(enabled);
-		filters << expr;
-	}
-	settings.endArray();
-	return filters;
-}
 
 
 QStuffMainWindow::QStuffMainWindow()
@@ -120,6 +76,7 @@ QStuffMainWindow::QStuffMainWindow()
 	addAction(refresh);
 
 	connect(m_widget->action_saveView, &QAction::triggered, this, &QStuffMainWindow::saveView);
+	connect(m_widget->action_manageViews, &QAction::triggered, this, &QStuffMainWindow::manageViews);
 	connect(m_widget->action_resetView, &QAction::triggered, this, [this]{
 		m_logModel->setColumns({"hostname", "programname", "msg"});
 		m_widget->logsTable->resizeColumnsToContents();
@@ -610,6 +567,14 @@ void QStuffMainWindow::showSettingsDialog()
 		m_chartWidget->setScaleToInterval(scaleToInterval);
 		search();
 	}
+}
+
+
+void QStuffMainWindow::manageViews()
+{
+	ManageViewsDialog dlg(this);
+	if (dlg.exec() == QDialog::Accepted)
+		dlg.savedViewsModel()->saveToSettings();
 }
 
 

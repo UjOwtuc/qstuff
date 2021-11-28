@@ -33,6 +33,7 @@ public slots:
 	void saveView();
 	void setInputsEnabled(bool enabled);
 	void showSettingsDialog();
+	void manageViews();
 
 protected slots:
 	void setKeys(const QVariantMap& keys);

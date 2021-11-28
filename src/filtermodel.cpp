@@ -3,6 +3,54 @@
 
 #include <QBrush>
 #include <QDebug>
+#include <QSettings>
+
+
+void saveFiltersArray(QSettings& settings, const QList<FilterExpression>& filters)
+{
+	int size = filters.size();
+	settings.beginWriteArray("filters", size);
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		const FilterExpression& filter = filters.at(i);
+		settings.setValue("id", filter.id());
+		settings.setValue("op", filter.op());
+		settings.setValue("value", filter.value());
+		if (filter.hasCustomLabel())
+			settings.setValue("label", filter.label());
+		else
+			settings.setValue("label", QString());
+		settings.setValue("inverted", filter.isInverted());
+		settings.setValue("enabled", filter.enabled());
+	}
+	settings.endArray();
+}
+
+
+QList<FilterExpression> loadFiltersArray(QSettings& settings)
+{
+	QList<FilterExpression> filters;
+	int size = settings.beginReadArray("filters");
+	for (int i=0; i<size; ++i)
+	{
+		settings.setArrayIndex(i);
+		QString id = settings.value("id").toString();
+		FilterExpression::Op op = static_cast<FilterExpression::Op>(settings.value("op").toInt());
+		QString value = settings.value("value").toString();
+		QString label = settings.value("label").toString();
+		bool inverted = settings.value("inverted").toBool();
+		bool enabled = settings.value("enabled").toBool();
+
+		FilterExpression expr(id, op, value, inverted);
+		expr.setLabel(label);
+		expr.setEnabled(enabled);
+		filters << expr;
+	}
+	settings.endArray();
+	return filters;
+}
+
 
 namespace {
 	QMap<FilterExpression::Op, QString>* opStrings = nullptr;
