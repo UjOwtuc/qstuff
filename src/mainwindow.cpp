@@ -15,9 +15,6 @@
 #include "syntaxcheckedlineedit.h"
 
 #include <QNetworkReply>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
 #include <QStandardItemModel>
 #include <QTimer>
 #include <QSettings>

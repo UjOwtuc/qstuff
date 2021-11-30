@@ -172,14 +172,13 @@ void ChartWidget::update(const QVariantMap& points)
 	QVariant firstValue = points.first();
 	if (firstValue.canConvert(QMetaType::ULongLong))
 	{
-		m_chart->legend()->hide();
+		qDebug() << "old counts format, upgrade stuffstream";
 		generateSeries("", points, minY, maxY, [](const QVariantMap::const_iterator& it) {
 			return it->toULongLong();
 		});
 	}
 	else
 	{
-		m_chart->legend()->show();
 		QStringList names = firstValue.toMap().keys();
 		for (const QString& name : qAsConst(names))
 		{
@@ -188,6 +187,11 @@ void ChartWidget::update(const QVariantMap& points)
 			});
 		}
 	}
+
+	if (m_chart->series().size() > 1)
+		m_chart->legend()->show();
+	else
+		m_chart->legend()->hide();
 
 	qint64 duration = minX.secsTo(maxX);
 	switch (duration)
