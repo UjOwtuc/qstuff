@@ -64,13 +64,17 @@ QNetworkReply* StuffstreamClient::fetchEvents(const QDateTime& start, const QDat
 }
 
 
-QNetworkReply* StuffstreamClient::fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query, const QString& splitBy, quint32 limitBuckets)
+QNetworkReply* StuffstreamClient::fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query, const QString& splitBy, quint32 limitBuckets, const QString& metric, const QString& aggregate)
 {
 	QUrlQuery queryItems = buildQueryParams(start, end, query);
 	if (! splitBy.isEmpty())
 		queryItems.addQueryItem("split_by", splitBy);
 	if (limitBuckets > 0)
 		queryItems.addQueryItem("max_buckets", QString::number(limitBuckets));
+	if (! metric.isEmpty())
+		queryItems.addQueryItem("value", metric);
+	if (! aggregate.isEmpty())
+		queryItems.addQueryItem("aggregate", aggregate);
 
 	QUrl url(m_baseUrl);
 	url.setPath("/counts");

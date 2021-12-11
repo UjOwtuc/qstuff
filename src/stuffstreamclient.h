@@ -28,7 +28,7 @@ public:
 
 public slots:
 	QNetworkReply* fetchEvents(const QDateTime& start, const QDateTime& end, const QString& query);
-	QNetworkReply* fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query, const QString& splitBy, quint32 limitBuckets);
+	QNetworkReply* fetchCounts(const QDateTime& start, const QDateTime& end, const QString& query, const QString& splitBy, quint32 limitBuckets, const QString& metric, const QString& aggregate);
 
 protected:
 	QNetworkReply* sendRequest(const QUrl& url);

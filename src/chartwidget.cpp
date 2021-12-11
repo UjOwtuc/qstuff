@@ -62,6 +62,12 @@ ChartWidget::ChartWidget(QWidget* parent)
 	m_widget->splitCombo->setValidator(validator);
 	m_widget->splitCombo->lineEdit()->setClearButtonEnabled(true);
 
+	m_widget->metricCombo->setLineEdit(new SyntaxCheckedLineedit(this));
+	validator = new QueryValidator(QueryValidator::Field, this);
+	validator->setAcceptEmpty(true);
+	m_widget->metricCombo->setValidator(validator);
+	m_widget->metricCombo->lineEdit()->setClearButtonEnabled(true);
+
 	m_xAxis = new QDateTimeAxis();
 	m_xAxis->setTickCount(10);
 	m_xAxis->setTitleText("Time");
@@ -85,7 +91,12 @@ ChartWidget::ChartWidget(QWidget* parent)
 	connect(StuffstreamClient::get(), &StuffstreamClient::receivedCounts, this, &ChartWidget::update);
 	connect(m_widget->splitCombo->lineEdit(), &QLineEdit::editingFinished, this, &ChartWidget::fetchIfSplitValueChanged);
 	connect(m_widget->splitCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChartWidget::fetchIfSplitValueChanged);
+	connect(m_widget->metricCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChartWidget::fetchIfSplitValueChanged);
+	connect(m_widget->aggregateCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChartWidget::fetchIfSplitValueChanged);
 	connect(m_widget->limitBucketsSpinbox, &QSpinBox::editingFinished, this, &ChartWidget::fetchIfSplitValueChanged);
+	connect(m_widget->metricCombo, &QComboBox::currentTextChanged, this, [this](const QString& text){
+		m_widget->aggregateCombo->setEnabled(!text.isEmpty());
+	});
 }
 
 
@@ -94,12 +105,16 @@ void ChartWidget::setSplitChoices(QAbstractItemModel* model)
 	QCompleter* completer = new QCompleter(this);
 	completer->setModel(model);
 	m_widget->splitCombo->setCompleter(completer);
+
+	completer = new QCompleter(this);
+	completer->setModel(model);
+	m_widget->metricCombo->setCompleter(completer);
 }
 
 
 qreal ChartWidget::scaleValueToInterval(quint64 value)
 {
-	if (m_scaleToInterval == 0)
+	if (m_scaleToInterval == 0 || ! m_currentMetric.isEmpty())
 		return value;
 
 	return m_scaleToInterval * value / static_cast<qreal>(m_currentInterval);
@@ -117,7 +132,7 @@ void ChartWidget::fetchCounts(const QDateTime& start, const QDateTime& end, cons
 }
 
 
-void ChartWidget::generateSeries(const QString& name, const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<quint64(const QVariantMap::const_iterator&)>& valueGetter)
+void ChartWidget::generateSeries(const QString& name, const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<QVariant(const QVariantMap::const_iterator&)>& valueGetter)
 {
 	QLineSeries* series = new QLineSeries();
 	series->setPointsVisible(true);
@@ -128,10 +143,15 @@ void ChartWidget::generateSeries(const QString& name, const QVariantMap& map, qu
 		QDateTime dt = QDateTime::fromString(it.key(), Qt::ISODate);
 		if (dt.isValid())
 		{
-			quint64 value = valueGetter(it);
-			minValue = std::min(value, minValue);
-			maxValue = std::max(value, maxValue);
-			series->append(dt.toMSecsSinceEpoch(), scaleValueToInterval(value));
+			QVariant value = valueGetter(it);
+			bool ok;
+			quint64 intValue = value.toULongLong(&ok);
+			if (ok)
+			{
+				minValue = std::min(intValue, minValue);
+				maxValue = std::max(intValue, maxValue);
+				series->append(dt.toMSecsSinceEpoch(), scaleValueToInterval(intValue));
+			}
 		}
 		else
 			qDebug() << "invalid date in points:" << it.key();
@@ -166,7 +186,13 @@ void ChartWidget::update(const QVariantMap& points)
 	++it;
 	const QDateTime secondPoint = QDateTime::fromString(it->first, Qt::ISODate);
 	m_currentInterval = minX.secsTo(secondPoint);
-	m_yAxis->setTitleText(QString("Events per %1").arg(prettyInterval(m_scaleToInterval == 0 ? m_currentInterval : m_scaleToInterval)));
+
+	QString ylabel;
+	if (m_currentMetric.isEmpty())
+		ylabel = QString("Events per %1").arg(prettyInterval(m_scaleToInterval == 0 ? m_currentInterval : m_scaleToInterval));
+	else
+		ylabel = QString("%1 %2").arg(m_currentAggregate, m_currentMetric);
+	m_yAxis->setTitleText(ylabel);
 
 
 	QVariant firstValue = points.first();
@@ -174,7 +200,7 @@ void ChartWidget::update(const QVariantMap& points)
 	{
 		qDebug() << "old counts format, upgrade stuffstream";
 		generateSeries("", points, minY, maxY, [](const QVariantMap::const_iterator& it) {
-			return it->toULongLong();
+			return it.value();
 		});
 	}
 	else
@@ -183,15 +209,15 @@ void ChartWidget::update(const QVariantMap& points)
 		for (const QString& name : qAsConst(names))
 		{
 			generateSeries(name, points, minY, maxY, [name](const QVariantMap::const_iterator& it) {
-				return it->toMap()[name].toULongLong();
+				return it->toMap()[name];
 			});
 		}
 	}
 
-	if (m_chart->series().size() > 1)
-		m_chart->legend()->show();
-	else
+	if (splitBy().isEmpty())
 		m_chart->legend()->hide();
+	else
+		m_chart->legend()->show();
 
 	qint64 duration = minX.secsTo(maxX);
 	switch (duration)
@@ -234,6 +260,19 @@ void ChartWidget::fetchIfSplitValueChanged()
 	{
 		m_currentBucketsLimit = m_widget->limitBucketsSpinbox->value();
 		emit limitBucketsChanged(m_currentBucketsLimit);
+		changed = true;
+	}
+	if (m_widget->metricCombo->currentText() != m_currentMetric)
+	{
+		m_currentMetric = m_widget->metricCombo->currentText();
+		emit metricChanged(m_currentMetric);
+		changed = true;
+	}
+	QString aggregate = m_widget->aggregateCombo->currentText().toLower();
+	if (aggregate != m_currentAggregate)
+	{
+		m_currentAggregate = aggregate;
+		emit aggregateChanged(m_currentAggregate);
 		changed = true;
 	}
 
@@ -286,7 +325,7 @@ void ChartWidget::sendFetchRequest()
 	if (m_lastQueryStart.isValid() && m_lastQueryEnd.isValid())
 	{
 		StuffstreamClient* client = StuffstreamClient::get();
-		client->fetchCounts(m_lastQueryStart, m_lastQueryEnd, m_lastQueryString, m_widget->splitCombo->currentText(), m_widget->limitBucketsSpinbox->value());
+		client->fetchCounts(m_lastQueryStart, m_lastQueryEnd, m_lastQueryString, m_widget->splitCombo->currentText(), m_widget->limitBucketsSpinbox->value(), m_widget->metricCombo->currentText(), m_widget->aggregateCombo->currentText().toLower());
 		m_forceRefresh = false;
 	}
 }

@@ -48,10 +48,12 @@ signals:
 	void limitBucketsChanged(quint32 value);
 	void lineClicked(const QString& name);
 	void scaleToIntervalChanged(quint64 value);
+	void metricChanged(QString metric);
+	void aggregateChanged(QString aggregate);
 
 protected:
 	void showEvent(QShowEvent* event) override;
-	void generateSeries(const QString& name, const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<quint64(const QVariantMap::const_iterator&)>& valueGetter);
+	void generateSeries(const QString& name, const QVariantMap& map, quint64& minValue, quint64& maxValue, const std::function<QVariant(const QVariantMap::const_iterator&)>& valueGetter);
 
 private:
 	Ui::ChartWidget* m_widget;
@@ -60,6 +62,8 @@ private:
 	QString m_lastQueryString;
 	QString m_currentSplitValue;
 	quint32 m_currentBucketsLimit;
+	QString m_currentMetric;
+	QString m_currentAggregate;
 	bool m_forceRefresh;
 	quint64 m_scaleToInterval;
 	quint64 m_currentInterval;
